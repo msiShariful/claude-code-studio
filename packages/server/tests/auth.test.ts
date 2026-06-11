@@ -63,4 +63,24 @@ describe('auth and health', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body).toContain('Claude Code Studio')
   })
+
+  it('enforces the token even for percent-encoded /api paths', async () => {
+    const app = makeApp()
+    const res = await app.inject({ method: 'GET', url: '/%61pi/health' })
+    expect(res.statusCode).toBe(401)
+  })
+
+  it('allows IPv6 loopback hosts', async () => {
+    const app = makeApp()
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/health',
+      headers: { host: '[::1]:3000', authorization: `Bearer ${TOKEN}` },
+    })
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('rejects an empty token at build time', () => {
+    expect(() => buildServer({ token: '' })).toThrow(/token/)
+  })
 })

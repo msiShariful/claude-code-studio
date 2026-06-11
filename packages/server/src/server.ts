@@ -1,6 +1,6 @@
 import { getBackupsRoot, getGlobalPaths, type GlobalPaths } from '@claude-code-studio/core'
 import Fastify, { type FastifyInstance } from 'fastify'
-import { registerAuth } from './auth.js'
+import { registerSecurity, requireBearerToken } from './auth.js'
 import { healthRoutes } from './routes/health.js'
 
 export interface BuildOptions {
@@ -15,12 +15,15 @@ export interface ServerContext {
 }
 
 export function buildServer(opts: BuildOptions): FastifyInstance {
+  if (!opts.token) {
+    throw new Error('token must be a non-empty string')
+  }
   const ctx: ServerContext = {
     globalPaths: opts.globalPaths ?? getGlobalPaths(),
     backupsRoot: opts.backupsRoot ?? getBackupsRoot(),
   }
   const app = Fastify({ logger: false })
-  registerAuth(app, opts.token)
+  registerSecurity(app)
   app.get('/', async (_req, reply) => {
     return reply
       .type('text/html')
@@ -28,7 +31,12 @@ export function buildServer(opts: BuildOptions): FastifyInstance {
         '<!doctype html><html><body><h1>Claude Code Studio</h1><p>The web UI ships in a later milestone. The API is running.</p></body></html>',
       )
   })
-  healthRoutes(app)
-  void ctx // settings/backups routes attach in later tasks
+  // All API routes live in this encapsulated context; the token hook is
+  // bound to matched routes, not URL prefixes (see auth.ts for why).
+  void app.register(async (api) => {
+    api.addHook('onRequest', requireBearerToken(opts.token))
+    healthRoutes(api)
+    void ctx // settings/backups routes attach here in later tasks
+  })
   return app
 }

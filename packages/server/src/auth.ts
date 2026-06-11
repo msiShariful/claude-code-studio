@@ -1,16 +1,19 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-const ALLOWED_HOSTNAMES = new Set(['127.0.0.1', 'localhost'])
+const ALLOWED_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '::1', '[::1]'])
 
 /**
  * Localhost hardening, on every request:
- *  - Host header must be 127.0.0.1 or localhost (blocks DNS rebinding).
- *  - An Origin header, when present, must also be one of those hosts (no CORS).
- *  - /api/* additionally requires the per-session bearer token.
+ *  - Host header must be a loopback name (blocks DNS rebinding).
+ *  - An Origin header, when present, must also be loopback (no CORS).
+ * Token auth is NOT handled here — it is a scoped hook bound to the API
+ * route context (see requireBearerToken), so it cannot be bypassed by
+ * raw-URL encoding tricks like /%61pi/health (find-my-way decodes for
+ * route matching; raw req.url string checks do not).
  */
-export function registerAuth(app: FastifyInstance, token: string): void {
+export function registerSecurity(app: FastifyInstance): void {
   app.addHook('onRequest', async (req, reply) => {
-    const hostname = (req.headers.host ?? '').split(':')[0]
+    const hostname = req.hostname
     if (!ALLOWED_HOSTNAMES.has(hostname)) {
       return reply.code(403).send({ error: 'forbidden_host' })
     }
@@ -21,10 +24,17 @@ export function registerAuth(app: FastifyInstance, token: string): void {
         return reply.code(403).send({ error: 'forbidden_origin' })
       }
     }
-    if (req.url.startsWith('/api/') && req.headers.authorization !== `Bearer ${token}`) {
+  })
+}
+
+/** Scoped onRequest hook: register inside the API plugin context only. */
+export function requireBearerToken(token: string) {
+  const expected = `Bearer ${token}`
+  return async (req: FastifyRequest, reply: FastifyReply) => {
+    if (req.headers.authorization !== expected) {
       return reply.code(401).send({ error: 'unauthorized' })
     }
-  })
+  }
 }
 
 function safeOriginHostname(origin: string): string | null {
