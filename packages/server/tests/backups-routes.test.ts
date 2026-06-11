@@ -1,10 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { backupFile } from '@claude-code-studio/core'
-import { fixture } from './settings-routes.test.js'
-
-const TOKEN = 't-test-token'
-const auth = { authorization: `Bearer ${TOKEN}` }
+import { auth, fixture } from './helpers.js'
 
 describe('backups routes', () => {
   it('lists backups newest-first', async () => {

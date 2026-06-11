@@ -2,20 +2,8 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { getGlobalPaths, getProjectPaths } from '@claude-code-studio/core'
-import { buildServer } from '../src/server.js'
-
-const TOKEN = 't-test-token'
-const auth = { authorization: `Bearer ${TOKEN}` }
-
-export async function fixture() {
-  const home = await mkdtemp(join(tmpdir(), 'ccs-srv-'))
-  const globalPaths = getGlobalPaths({ CLAUDE_CONFIG_DIR: join(home, '.claude') }, 'linux', home)
-  await mkdir(globalPaths.configDir, { recursive: true })
-  const backupsRoot = join(home, 'backups')
-  const app = buildServer({ token: TOKEN, globalPaths, backupsRoot })
-  return { home, globalPaths, backupsRoot, app }
-}
+import { getProjectPaths } from '@claude-code-studio/core'
+import { auth, fixture } from './helpers.js'
 
 describe('GET /api/settings', () => {
   it('returns entries and effective settings for the user scope', async () => {
