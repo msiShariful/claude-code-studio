@@ -42,4 +42,21 @@ describe('resolveEffectiveSettings', () => {
     expect(result.value).toEqual({})
     expect(result.sources).toEqual({})
   })
+
+  it('ignores prototype-polluting keys in settings files', () => {
+    const malicious = JSON.parse('{"__proto__": {"polluted": true}}') as Record<string, unknown>
+    const result = resolveEffectiveSettings([entry('user', malicious), entry('managed', undefined)])
+    expect(result.value).toEqual({})
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+  })
+
+  it('drops stale nested sources when a higher scope replaces an object with a scalar', () => {
+    const result = resolveEffectiveSettings([
+      entry('user', { env: { FOO: '1' } }),
+      entry('managed', { env: 'off' }),
+    ])
+    expect(result.value).toEqual({ env: 'off' })
+    expect(result.sources['env']).toBe('managed')
+    expect(result.sources['env.FOO']).toBeUndefined()
+  })
 })

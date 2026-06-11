@@ -29,11 +29,18 @@ function mergeInto(
   prefix: string,
 ): void {
   for (const [key, v] of Object.entries(src)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue
     const path = prefix ? `${prefix}.${key}` : key
     if (isPlainObject(v)) {
       if (!isPlainObject(target[key])) target[key] = {}
       mergeInto(target[key] as Record<string, unknown>, v, scope, sources, path)
     } else {
+      if (isPlainObject(target[key])) {
+        const stalePrefix = path + '.'
+        for (const k of Object.keys(sources)) {
+          if (k.startsWith(stalePrefix)) delete sources[k]
+        }
+      }
       target[key] = v
       sources[path] = scope
     }
