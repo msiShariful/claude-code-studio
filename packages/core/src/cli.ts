@@ -29,6 +29,9 @@ export async function runCommand(
     return { command, exitCode: 0, stdout, stderr }
   } catch (err) {
     const e = err as Error & { code?: number | string; stdout?: string; stderr?: string }
+    // e.code is a number only for normal process exits (e.g. exit(3)).
+    // Timeouts (e.code === null, e.killed === true) and missing binaries
+    // (e.code === 'ENOENT') both fail this guard and are re-thrown.
     if (typeof e.code === 'number') {
       return { command, exitCode: e.code, stdout: e.stdout ?? '', stderr: e.stderr ?? '' }
     }
