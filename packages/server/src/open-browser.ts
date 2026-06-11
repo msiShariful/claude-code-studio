@@ -5,6 +5,8 @@ export function browserCommand(
   platform: NodeJS.Platform = process.platform,
 ): { bin: string; args: string[] } {
   if (platform === 'darwin') return { bin: 'open', args: [url] }
+  // cmd.exe reinterprets metacharacters (notably &) inside arguments; the
+  // launch URL must stay free of them. /#token=<hex> is safe today.
   if (platform === 'win32') return { bin: 'cmd', args: ['/c', 'start', '', url] }
   return { bin: 'xdg-open', args: [url] }
 }
