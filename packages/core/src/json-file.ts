@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
@@ -66,7 +66,7 @@ export async function writeJsonFileAtomic<T>(
   }
   const raw = serializeJson(value)
   await mkdir(dirname(path), { recursive: true })
-  const tmp = `${path}.tmp-${process.pid}`
+  const tmp = `${path}.tmp-${process.pid}-${randomBytes(4).toString('hex')}`
   await writeFile(tmp, raw, 'utf8')
   await rename(tmp, path)
   return { path, exists: true, raw, hash: hashContent(raw), value }

@@ -53,6 +53,36 @@ describe('planJsonUpdate', () => {
     const state = await readJsonFile<Record<string, unknown>>(file)
     expect(() => planJsonUpdate(state, [{ path: 'a', value: 1 }])).toThrow(/not valid JSON/)
   })
+
+  it('rejects prototype-polluting paths', async () => {
+    const { dir } = await setup()
+    const state = await readJsonFile<Record<string, unknown>>(join(dir, 'new.json'))
+    expect(() => planJsonUpdate(state, [{ path: '__proto__.polluted', value: true }])).toThrow(
+      /forbidden key/,
+    )
+    expect(() => planJsonUpdate(state, [{ path: 'a.constructor.b', value: 1 }])).toThrow(
+      /forbidden key/,
+    )
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+  })
+
+  it('rejects an empty path', async () => {
+    const { dir } = await setup()
+    const state = await readJsonFile<Record<string, unknown>>(join(dir, 'new.json'))
+    expect(() => planJsonUpdate(state, [{ path: '', value: 1 }])).toThrow(/must not be empty/)
+  })
+
+  it('refuses to set through an array but treats remove through an array as a no-op', async () => {
+    const { dir } = await setup()
+    const file = join(dir, 's.json')
+    await writeFile(file, '{"plugins": ["a", "b"]}')
+    const state = await readJsonFile<Record<string, unknown>>(file)
+    expect(() => planJsonUpdate(state, [{ path: 'plugins.timeout', value: 5000 }])).toThrow(
+      /is an array/,
+    )
+    const change = planJsonUpdate(state, [{ path: 'plugins.timeout', remove: true }])
+    expect(change.nextValue).toEqual({ plugins: ['a', 'b'] })
+  })
 })
 
 describe('applyChange', () => {
