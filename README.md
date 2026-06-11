@@ -3,10 +3,10 @@
 A local GUI for managing Claude Code settings — config files, MCP servers,
 plugins, hooks, agents, skills, and CLAUDE.md — without living in the terminal.
 
-> Status: early development. The config engine (`packages/core`) is being
-> built first; the local API server and web UI follow. See
-> `docs/superpowers/specs/` for the design and `docs/superpowers/plans/`
-> for implementation plans.
+> Status: early development. The config engine (`packages/core`) and the
+> localhost API server + launcher (`packages/server`) are done; the web UI
+> is next. See `docs/superpowers/specs/` for the design and
+> `docs/superpowers/plans/` for implementation plans.
 
 ## Planned usage
 
@@ -21,7 +21,8 @@ One command starts a localhost-only server and opens the GUI in your browser.
 - `packages/core` — config engine: reads/writes every Claude Code config
   surface with diff previews, automatic backups, and conflict detection.
   Prefers shelling out to the `claude` CLI over hand-editing its files.
-- `packages/server` — (planned) localhost-only Fastify API, token-protected.
+- `packages/server` — localhost-only Fastify API + `claude-code-studio` bin.
+  Token-protected, Host/Origin validated, random port per session.
 - `packages/web` — (planned) React UI.
 
 ## Development
