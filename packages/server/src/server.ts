@@ -2,6 +2,7 @@ import { getBackupsRoot, getGlobalPaths, type GlobalPaths } from '@claude-code-s
 import Fastify, { type FastifyInstance } from 'fastify'
 import { registerSecurity, requireBearerToken } from './auth.js'
 import { healthRoutes } from './routes/health.js'
+import { settingsRoutes } from './routes/settings.js'
 
 export interface BuildOptions {
   token: string
@@ -36,7 +37,7 @@ export function buildServer(opts: BuildOptions): FastifyInstance {
   void app.register(async (api) => {
     api.addHook('onRequest', requireBearerToken(opts.token))
     healthRoutes(api)
-    void ctx // settings/backups routes attach here in later tasks
+    settingsRoutes(api, ctx)
   })
   return app
 }
