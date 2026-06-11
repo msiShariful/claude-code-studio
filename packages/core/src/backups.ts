@@ -19,7 +19,8 @@ export async function backupFile(
 ): Promise<BackupEntry | null> {
   try {
     await stat(originalPath)
-  } catch {
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
     return null
   }
   await mkdir(backupsRoot, { recursive: true })
@@ -33,7 +34,8 @@ export async function listBackups(backupsRoot: string): Promise<BackupEntry[]> {
   let names: string[]
   try {
     names = await readdir(backupsRoot)
-  } catch {
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
     return []
   }
   const entries: BackupEntry[] = []
