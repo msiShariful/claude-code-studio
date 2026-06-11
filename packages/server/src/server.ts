@@ -34,6 +34,8 @@ export function buildServer(opts: BuildOptions): FastifyInstance {
   })
   // All API routes live in this encapsulated context; the token hook is
   // bound to matched routes, not URL prefixes (see auth.ts for why).
+  // void is safe here: app.listen()/app.inject() both await app.ready(),
+  // which guarantees plugin registration completes before requests are served.
   void app.register(async (api) => {
     api.addHook('onRequest', requireBearerToken(opts.token))
     healthRoutes(api)
