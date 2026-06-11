@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 
 export interface JsonFileState<T = unknown> {
   path: string
@@ -32,4 +33,41 @@ export async function readJsonFile<T = unknown>(path: string): Promise<JsonFileS
     state.parseError = (err as Error).message
   }
   return state
+}
+
+export class WriteConflictError extends Error {
+  constructor(public readonly filePath: string) {
+    super(`File changed on disk since it was read: ${filePath}`)
+    this.name = 'WriteConflictError'
+  }
+}
+
+export function serializeJson(value: unknown): string {
+  return JSON.stringify(value, null, 2) + '\n'
+}
+
+/**
+ * expectedHash semantics:
+ *  - undefined: skip the conflict check
+ *  - null: caller expects the file not to exist yet
+ *  - string: caller expects current content to hash to this value
+ */
+export async function writeJsonFileAtomic<T>(
+  path: string,
+  value: T,
+  opts: { expectedHash?: string | null } = {},
+): Promise<JsonFileState<T>> {
+  if (opts.expectedHash !== undefined) {
+    const current = await readJsonFile(path)
+    const currentHash = current.exists ? current.hash! : null
+    if (currentHash !== opts.expectedHash) {
+      throw new WriteConflictError(path)
+    }
+  }
+  const raw = serializeJson(value)
+  await mkdir(dirname(path), { recursive: true })
+  const tmp = `${path}.tmp-${process.pid}`
+  await writeFile(tmp, raw, 'utf8')
+  await rename(tmp, path)
+  return { path, exists: true, raw, hash: hashContent(raw), value }
 }
