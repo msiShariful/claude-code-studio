@@ -1,6 +1,7 @@
 import { getBackupsRoot, getGlobalPaths, type GlobalPaths } from '@claude-code-studio/core'
 import Fastify, { type FastifyInstance } from 'fastify'
 import { registerSecurity, requireBearerToken } from './auth.js'
+import { backupsRoutes } from './routes/backups.js'
 import { healthRoutes } from './routes/health.js'
 import { settingsRoutes } from './routes/settings.js'
 
@@ -40,6 +41,7 @@ export function buildServer(opts: BuildOptions): FastifyInstance {
     api.addHook('onRequest', requireBearerToken(opts.token))
     healthRoutes(api)
     settingsRoutes(api, ctx)
+    backupsRoutes(api, ctx)
   })
   return app
 }
