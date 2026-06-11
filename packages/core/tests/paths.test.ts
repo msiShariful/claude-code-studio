@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getGlobalPaths, getProjectPaths } from '../src/paths.js'
+import { getBackupsRoot, getGlobalPaths, getProjectPaths } from '../src/paths.js'
 
 describe('getGlobalPaths', () => {
   it('defaults to ~/.claude and ~/.claude.json', () => {
@@ -50,5 +50,11 @@ describe('getProjectPaths', () => {
     expect(p.agentsDir).toBe('/work/app/.claude/agents')
     expect(p.projectDir).toBe('/work/app')
     expect(p.skillsDir).toBe('/work/app/.claude/skills')
+  })
+})
+
+describe('getBackupsRoot', () => {
+  it('defaults to ~/.claude-code-studio/backups', () => {
+    expect(getBackupsRoot('/Users/alice')).toBe('/Users/alice/.claude-code-studio/backups')
   })
 })

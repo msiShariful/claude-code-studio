@@ -18,6 +18,15 @@ describe('runCommand', () => {
   it('throws for a missing binary', async () => {
     await expect(runCommand('definitely-not-a-real-binary-xyz', [])).rejects.toThrow()
   })
+
+  it('handles outputs larger than 1MB', async () => {
+    const result = await runCommand('node', [
+      '-e',
+      "process.stdout.write('x'.repeat(2 * 1024 * 1024))",
+    ])
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout.length).toBe(2 * 1024 * 1024)
+  })
 })
 
 describe('detectCli', () => {

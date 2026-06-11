@@ -18,13 +18,14 @@ export interface CliRunResult {
 export async function runCommand(
   bin: string,
   args: string[],
-  opts: { cwd?: string; timeoutMs?: number } = {},
+  opts: { cwd?: string; timeoutMs?: number; maxBuffer?: number } = {},
 ): Promise<CliRunResult> {
   const command = [bin, ...args].join(' ')
   try {
     const { stdout, stderr } = await execFileAsync(bin, args, {
       cwd: opts.cwd,
       timeout: opts.timeoutMs ?? 30_000,
+      maxBuffer: opts.maxBuffer ?? 10 * 1024 * 1024,
     })
     return { command, exitCode: 0, stdout, stderr }
   } catch (err) {

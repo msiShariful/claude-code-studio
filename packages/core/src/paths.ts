@@ -67,3 +67,8 @@ export function getProjectPaths(projectDir: string): ProjectPaths {
     skillsDir: join(dotClaude, 'skills'),
   }
 }
+
+/** Canonical backups directory for Claude Code Studio itself (kept outside ~/.claude). */
+export function getBackupsRoot(home: string = osHomedir()): string {
+  return join(home, '.claude-code-studio', 'backups')
+}
