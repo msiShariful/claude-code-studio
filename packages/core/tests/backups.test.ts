@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { backupFile, listBackups, pruneBackups, restoreBackup } from '../src/backups.js'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -53,5 +53,21 @@ describe('backups', () => {
   it('lists nothing for a missing backups root', async () => {
     const { dir } = await setup()
     expect(await listBackups(join(dir, 'no-such-root'))).toEqual([])
+  })
+
+  it('does not overwrite backups created in the same millisecond', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-11T00:00:00.000Z'))
+    try {
+      const { dir, backupsRoot } = await setup()
+      const file = join(dir, 'same-ms.json')
+      await writeFile(file, '{"v": 1}')
+      await backupFile(file, backupsRoot)
+      await writeFile(file, '{"v": 2}')
+      await backupFile(file, backupsRoot)
+      expect(await listBackups(backupsRoot)).toHaveLength(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

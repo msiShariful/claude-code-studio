@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { copyFile, mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -12,7 +13,7 @@ function timestampNow(): string {
   return new Date().toISOString().replace(/[:.]/g, '-')
 }
 
-/** Backup file name format: `<timestamp>__<encodeURIComponent(originalPath)>` */
+/** Backup file name format: `<timestamp>__<nonce>__<encodeURIComponent(originalPath)>` */
 export async function backupFile(
   originalPath: string,
   backupsRoot: string,
@@ -25,7 +26,10 @@ export async function backupFile(
   }
   await mkdir(backupsRoot, { recursive: true })
   const timestamp = timestampNow()
-  const backupPath = join(backupsRoot, `${timestamp}__${encodeURIComponent(originalPath)}`)
+  const backupPath = join(
+    backupsRoot,
+    `${timestamp}__${randomBytes(3).toString('hex')}__${encodeURIComponent(originalPath)}`,
+  )
   await copyFile(originalPath, backupPath)
   return { backupPath, originalPath, timestamp }
 }
@@ -40,12 +44,14 @@ export async function listBackups(backupsRoot: string): Promise<BackupEntry[]> {
   }
   const entries: BackupEntry[] = []
   for (const name of names) {
-    const sep = name.indexOf('__')
-    if (sep === -1) continue
+    const first = name.indexOf('__')
+    if (first === -1) continue
+    const second = name.indexOf('__', first + 2)
+    if (second === -1) continue
     entries.push({
       backupPath: join(backupsRoot, name),
-      timestamp: name.slice(0, sep),
-      originalPath: decodeURIComponent(name.slice(sep + 2)),
+      timestamp: name.slice(0, first),
+      originalPath: decodeURIComponent(name.slice(second + 2)),
     })
   }
   return entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp))
