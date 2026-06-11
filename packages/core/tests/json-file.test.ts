@@ -77,4 +77,17 @@ describe('writeJsonFileAtomic', () => {
     const after = await writeJsonFileAtomic(file, { v: 2 }, { expectedHash: before.hash })
     expect(after.value).toEqual({ v: 2 })
   })
+
+  it('exposes a stable code on WriteConflictError for HTTP mapping', async () => {
+    const dir = await tempDir()
+    const file = join(dir, 'conflict-code.json')
+    await writeFile(file, '{"v": 1}')
+    const before = await readJsonFile(file)
+    await writeFile(file, '{"v": 2}')
+    const err = await writeJsonFileAtomic(file, { v: 3 }, { expectedHash: before.hash }).catch(
+      (e: unknown) => e,
+    )
+    expect(err).toBeInstanceOf(WriteConflictError)
+    expect((err as WriteConflictError).code).toBe('WRITE_CONFLICT')
+  })
 })

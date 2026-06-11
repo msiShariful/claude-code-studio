@@ -36,6 +36,8 @@ export async function readJsonFile<T = unknown>(path: string): Promise<JsonFileS
 }
 
 export class WriteConflictError extends Error {
+  readonly code = 'WRITE_CONFLICT'
+
   constructor(public readonly filePath: string) {
     super(`File changed on disk since it was read: ${filePath}`)
     this.name = 'WriteConflictError'
