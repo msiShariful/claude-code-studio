@@ -8,6 +8,16 @@ describe('getGlobalPaths', () => {
     expect(p.settings).toBe('/Users/alice/.claude/settings.json')
     expect(p.claudeJson).toBe('/Users/alice/.claude.json')
     expect(p.keybindings).toBe('/Users/alice/.claude/keybindings.json')
+    expect(p.claudeMd).toBe('/Users/alice/.claude/CLAUDE.md')
+    expect(p.agentsDir).toBe('/Users/alice/.claude/agents')
+    expect(p.skillsDir).toBe('/Users/alice/.claude/skills')
+    expect(p.pluginsDir).toBe('/Users/alice/.claude/plugins')
+  })
+
+  it('treats an empty CLAUDE_CONFIG_DIR as unset', () => {
+    const p = getGlobalPaths({ CLAUDE_CONFIG_DIR: '' }, 'linux', '/home/alice')
+    expect(p.configDir).toBe('/home/alice/.claude')
+    expect(p.claudeJson).toBe('/home/alice/.claude.json')
   })
 
   it('honors CLAUDE_CONFIG_DIR for the config dir and .claude.json', () => {
@@ -38,5 +48,7 @@ describe('getProjectPaths', () => {
     expect(p.mcpJson).toBe('/work/app/.mcp.json')
     expect(p.claudeMd).toBe('/work/app/CLAUDE.md')
     expect(p.agentsDir).toBe('/work/app/.claude/agents')
+    expect(p.projectDir).toBe('/work/app')
+    expect(p.skillsDir).toBe('/work/app/.claude/skills')
   })
 })

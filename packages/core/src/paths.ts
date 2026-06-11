@@ -18,7 +18,7 @@ export function getGlobalPaths(
   platform: NodeJS.Platform = process.platform,
   home: string = osHomedir(),
 ): GlobalPaths {
-  const configDir = env.CLAUDE_CONFIG_DIR ?? join(home, '.claude')
+  const configDir = env.CLAUDE_CONFIG_DIR || join(home, '.claude')
   const claudeJson = env.CLAUDE_CONFIG_DIR
     ? join(configDir, '.claude.json')
     : join(home, '.claude.json')
