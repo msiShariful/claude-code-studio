@@ -131,6 +131,16 @@ pre {
   align-items: center;
 }
 
+.project-row .nav-item {
+  min-width: 0;
+}
+
+.project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .remove-extra {
   font: inherit;
   background: none;
