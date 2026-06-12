@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Api } from './api.js'
 import { Backups } from './views/Backups.js'
 import { Dashboard } from './views/Dashboard.js'
-import { Editor } from './views/Editor.js'
+import { Editor, type EditorJump } from './views/Editor.js'
 import { Effective } from './views/Effective.js'
 import { Files } from './views/Files.js'
 import { Mcp } from './views/Mcp.js'
@@ -25,7 +25,13 @@ export function App({ token }: { token: string | null }) {
   const [projectDir, setProjectDir] = useState(
     () => window.localStorage.getItem('ccs-project-dir') ?? '',
   )
+  const [editorJump, setEditorJump] = useState<EditorJump | null>(null)
   const api = useMemo(() => (token ? new Api(token) : null), [token])
+
+  function jumpToEditor(scope: EditorJump['scope'], path: string) {
+    setEditorJump({ scope, path })
+    setView('editor')
+  }
 
   if (!api) {
     return (
@@ -71,8 +77,15 @@ export function App({ token }: { token: string | null }) {
       </aside>
       <main className="content">
         {view === 'dashboard' && <Dashboard api={api} projectDir={projectDir} />}
-        {view === 'effective' && <Effective api={api} projectDir={projectDir} />}
-        {view === 'editor' && <Editor api={api} projectDir={projectDir} />}
+        {view === 'effective' && <Effective api={api} projectDir={projectDir} onEdit={jumpToEditor} />}
+        {view === 'editor' && (
+          <Editor
+            api={api}
+            projectDir={projectDir}
+            jump={editorJump}
+            onJumpConsumed={() => setEditorJump(null)}
+          />
+        )}
         {view === 'files' && <Files api={api} projectDir={projectDir} />}
         {view === 'mcp' && <Mcp api={api} projectDir={projectDir} />}
         {view === 'plugins' && <Plugins api={api} />}

@@ -2,7 +2,15 @@ import { useEffect, useState } from 'react'
 import type { Api, SettingsResponse } from '../api.js'
 import { flattenLeaves } from '../utils.js'
 
-export function Effective({ api, projectDir }: { api: Api; projectDir: string }) {
+export function Effective({
+  api,
+  projectDir,
+  onEdit,
+}: {
+  api: Api
+  projectDir: string
+  onEdit?: (scope: 'user' | 'project' | 'projectLocal', path: string) => void
+}) {
   const [data, setData] = useState<SettingsResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -38,15 +46,27 @@ export function Effective({ api, projectDir }: { api: Api; projectDir: string })
             </tr>
           </thead>
           <tbody>
-            {leaves.map((leaf) => (
-              <tr key={leaf.path}>
-                <td className="path">{leaf.path}</td>
-                <td className="value">{JSON.stringify(leaf.value)}</td>
-                <td>
-                  {leaf.source ? <span className={`badge ${leaf.source}`}>{leaf.source}</span> : null}
-                </td>
-              </tr>
-            ))}
+            {leaves.map((leaf) => {
+              const editable = leaf.source && leaf.source !== 'managed'
+              return (
+                <tr
+                  key={leaf.path}
+                  style={editable && onEdit ? { cursor: 'pointer' } : undefined}
+                  title={editable ? 'Click to edit this value at its source scope' : undefined}
+                  onClick={
+                    editable && onEdit
+                      ? () => onEdit(leaf.source as 'user' | 'project' | 'projectLocal', leaf.path)
+                      : undefined
+                  }
+                >
+                  <td className="path">{leaf.path}</td>
+                  <td className="value">{JSON.stringify(leaf.value)}</td>
+                  <td>
+                    {leaf.source ? <span className={`badge ${leaf.source}`}>{leaf.source}</span> : null}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       )}

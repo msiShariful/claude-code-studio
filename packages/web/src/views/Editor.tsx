@@ -3,7 +3,12 @@ import { ApiError, type Api, type PendingChangeDto, type SettingsResponse } from
 import { diffLineKind, parseEditValue } from '../utils.js'
 
 const EDITABLE = ['user', 'project', 'projectLocal'] as const
-type EditableScope = (typeof EDITABLE)[number]
+export type EditableScope = (typeof EDITABLE)[number]
+
+export interface EditorJump {
+  scope: EditableScope
+  path: string
+}
 
 interface EditRow {
   path: string
@@ -13,12 +18,31 @@ interface EditRow {
 
 const EMPTY_ROW: EditRow = { path: '', value: '', remove: false }
 
-export function Editor({ api, projectDir }: { api: Api; projectDir: string }) {
+export function Editor({
+  api,
+  projectDir,
+  jump,
+  onJumpConsumed,
+}: {
+  api: Api
+  projectDir: string
+  jump?: EditorJump | null
+  onJumpConsumed?: () => void
+}) {
   const [scope, setScope] = useState<EditableScope>('user')
   const [data, setData] = useState<SettingsResponse | null>(null)
   const [rows, setRows] = useState<EditRow[]>([EMPTY_ROW])
   const [pending, setPending] = useState<PendingChangeDto | null>(null)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
+
+  useEffect(() => {
+    if (!jump) return
+    setScope(jump.scope)
+    setRows([{ path: jump.path, value: '', remove: false }])
+    setPending(null)
+    setMessage(null)
+    onJumpConsumed?.()
+  }, [jump, onJumpConsumed])
 
   const reload = useCallback(async () => {
     setData(null)
