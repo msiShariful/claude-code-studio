@@ -43,7 +43,7 @@ export function App({ token }: { token: string | null }) {
         <h1 className="wordmark">Claude Code Studio</h1>
         <p>
           No session token found. Start the app from your terminal with{' '}
-          <code>npx claude-code-studio</code> and open the URL it prints — the token rides along in
+          <code>npx cc-studio</code> and open the URL it prints — the token rides along in
           that URL.
         </p>
       </main>
