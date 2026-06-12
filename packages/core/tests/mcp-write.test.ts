@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { listBackups } from '../src/backups.js'
 import type { CliRunner } from '../src/cli.js'
 import { addMcpServer, removeMcpServer } from '../src/mcp.js'
-import { mcpFixture } from './mcp.test.js'
+import { mcpFixture } from './fixtures.js'
 
 const okRunner: CliRunner = vi
   .fn()

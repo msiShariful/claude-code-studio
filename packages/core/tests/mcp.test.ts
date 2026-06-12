@@ -1,17 +1,8 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { getGlobalPaths } from '../src/paths.js'
 import { readMcpServers } from '../src/mcp.js'
-
-export async function mcpFixture() {
-  const home = await mkdtemp(join(tmpdir(), 'ccs-mcp-'))
-  const projectDir = await mkdtemp(join(tmpdir(), 'ccs-mcp-proj-'))
-  const global = getGlobalPaths({ CLAUDE_CONFIG_DIR: join(home, '.claude') }, 'linux', home)
-  await mkdir(global.configDir, { recursive: true })
-  return { home, projectDir, global }
-}
+import { mcpFixture } from './fixtures.js'
 
 describe('readMcpServers', () => {
   it('reads user-scope servers from ~/.claude.json mcpServers', async () => {
