@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { registerSecurity, requireBearerToken } from './auth.js'
 import { backupsRoutes } from './routes/backups.js'
+import { filesRoutes } from './routes/files.js'
 import { healthRoutes } from './routes/health.js'
 import { mcpRoutes } from './routes/mcp.js'
 import { pluginsRoutes } from './routes/plugins.js'
@@ -68,6 +69,7 @@ export function buildServer(opts: BuildOptions): FastifyInstance {
     backupsRoutes(api, ctx)
     mcpRoutes(api, ctx)
     pluginsRoutes(api, ctx)
+    filesRoutes(api, ctx)
   })
   return app
 }
