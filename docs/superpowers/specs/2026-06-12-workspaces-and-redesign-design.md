@@ -100,9 +100,9 @@ token hook in the encapsulated api plugin).
 - "+ Add project…" accepts a path for directories Claude Code hasn't seen;
   extras persist in `localStorage` (`ccs-extra-projects`) and ride along as
   `?extra=`. Extras can be removed from the list.
-- The active project and sidebar expansion state persist in `localStorage`
-  (`ccs-active-project`), restored on load. The v1 `ccs-project-dir` key is
-  retired.
+- The active workspace (the full `{kind, dir}` union, which also drives
+  sidebar expansion) persists in `localStorage` (`ccs-workspace`), restored on
+  load. The v1 `ccs-project-dir` key is retired.
 
 ## 3. Visual design system
 
