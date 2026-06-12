@@ -1,5 +1,8 @@
 import { getBackupsRoot, getGlobalPaths, type GlobalPaths } from '@claude-code-studio/core'
+import fastifyStatic from '@fastify/static'
 import Fastify, { type FastifyInstance } from 'fastify'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { registerSecurity, requireBearerToken } from './auth.js'
 import { backupsRoutes } from './routes/backups.js'
 import { healthRoutes } from './routes/health.js'
@@ -9,6 +12,8 @@ export interface BuildOptions {
   token: string
   globalPaths?: GlobalPaths
   backupsRoot?: string
+  /** Directory containing the built SPA (index.html + assets). Optional: without it a placeholder page is served. */
+  webRoot?: string
 }
 
 export interface ServerContext {
@@ -26,13 +31,26 @@ export function buildServer(opts: BuildOptions): FastifyInstance {
   }
   const app = Fastify({ logger: false })
   registerSecurity(app)
-  app.get('/', async (_req, reply) => {
-    return reply
-      .type('text/html')
-      .send(
-        '<!doctype html><html><body><h1>Claude Code Studio</h1><p>The web UI ships in a later milestone. The API is running.</p></body></html>',
-      )
-  })
+  const webRoot = opts.webRoot
+  if (webRoot && existsSync(join(webRoot, 'index.html'))) {
+    void app.register(fastifyStatic, { root: webRoot })
+    app.setNotFoundHandler((req, reply) => {
+      // Fail-closed string check: an encoded /api path would merely get
+      // index.html instead of a JSON 404 — auth never depends on this.
+      if (req.method !== 'GET' || req.url.startsWith('/api')) {
+        return reply.code(404).send({ error: 'not_found' })
+      }
+      return reply.sendFile('index.html')
+    })
+  } else {
+    app.get('/', async (_req, reply) => {
+      return reply
+        .type('text/html')
+        .send(
+          '<!doctype html><html><body><h1>Claude Code Studio</h1><p>The web UI ships in a later milestone. The API is running.</p></body></html>',
+        )
+    })
+  }
   // All API routes live in this encapsulated context; the token hook is
   // bound to matched routes, not URL prefixes (see auth.ts for why).
   // void is safe here: app.listen()/app.inject() both await app.ready(),
