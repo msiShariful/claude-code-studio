@@ -7,6 +7,7 @@ import { registerSecurity, requireBearerToken } from './auth.js'
 import { backupsRoutes } from './routes/backups.js'
 import { healthRoutes } from './routes/health.js'
 import { mcpRoutes } from './routes/mcp.js'
+import { pluginsRoutes } from './routes/plugins.js'
 import { settingsRoutes } from './routes/settings.js'
 
 export interface BuildOptions {
@@ -66,6 +67,7 @@ export function buildServer(opts: BuildOptions): FastifyInstance {
     settingsRoutes(api, ctx)
     backupsRoutes(api, ctx)
     mcpRoutes(api, ctx)
+    pluginsRoutes(api, ctx)
   })
   return app
 }
