@@ -1,4 +1,4 @@
-import { getBackupsRoot, getGlobalPaths, type GlobalPaths } from '@claude-code-studio/core'
+import { getBackupsRoot, getGlobalPaths, runCommand, type CliRunner, type GlobalPaths } from '@claude-code-studio/core'
 import fastifyStatic from '@fastify/static'
 import Fastify, { type FastifyInstance } from 'fastify'
 import { existsSync } from 'node:fs'
@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { registerSecurity, requireBearerToken } from './auth.js'
 import { backupsRoutes } from './routes/backups.js'
 import { healthRoutes } from './routes/health.js'
+import { mcpRoutes } from './routes/mcp.js'
 import { settingsRoutes } from './routes/settings.js'
 
 export interface BuildOptions {
@@ -14,11 +15,14 @@ export interface BuildOptions {
   backupsRoot?: string
   /** Directory containing the built SPA (index.html + assets). Optional: without it a placeholder page is served. */
   webRoot?: string
+  /** Injectable for tests; defaults to the real runCommand. */
+  runner?: CliRunner
 }
 
 export interface ServerContext {
   globalPaths: GlobalPaths
   backupsRoot: string
+  runner: CliRunner
 }
 
 export function buildServer(opts: BuildOptions): FastifyInstance {
@@ -28,6 +32,7 @@ export function buildServer(opts: BuildOptions): FastifyInstance {
   const ctx: ServerContext = {
     globalPaths: opts.globalPaths ?? getGlobalPaths(),
     backupsRoot: opts.backupsRoot ?? getBackupsRoot(),
+    runner: opts.runner ?? runCommand,
   }
   const app = Fastify({ logger: false })
   registerSecurity(app)
@@ -60,6 +65,7 @@ export function buildServer(opts: BuildOptions): FastifyInstance {
     healthRoutes(api)
     settingsRoutes(api, ctx)
     backupsRoutes(api, ctx)
+    mcpRoutes(api, ctx)
   })
   return app
 }
