@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError, type Api, type FileKind, type FileScope, type FilesListingDto } from '../api.js'
+import { workspaceProjectDir, type Workspace } from '../workspace.js'
 
-const TABS = [
+const GLOBAL_TABS = [
   ['claudeMd', 'CLAUDE.md'],
   ['agent', 'Agents'],
   ['skill', 'Skills'],
   ['keybindings', 'Keybindings'],
 ] as const
 
-type Tab = (typeof TABS)[number][0]
+const PROJECT_TABS = [
+  ['claudeMd', 'CLAUDE.md'],
+  ['agent', 'Agents'],
+  ['skill', 'Skills'],
+] as const
+
+type Tab = (typeof GLOBAL_TABS)[number][0]
 
 interface Open {
   kind: FileKind
@@ -19,10 +26,12 @@ interface Open {
   path: string
 }
 
-export function Files({ api, projectDir }: { api: Api; projectDir: string }) {
+export function Files({ api, workspace }: { api: Api; workspace: Workspace }) {
+  const projectDir = workspaceProjectDir(workspace)
+  const tabs = workspace.kind === 'global' ? GLOBAL_TABS : PROJECT_TABS
+  const fileScope: FileScope = workspace.kind === 'global' ? 'user' : 'project'
   const [listing, setListing] = useState<FilesListingDto | null>(null)
   const [tab, setTab] = useState<Tab>('claudeMd')
-  const [scope, setScope] = useState<FileScope>('user')
   const [open, setOpen] = useState<Open | null>(null)
   const [dirty, setDirty] = useState(false)
   const [newName, setNewName] = useState('')
@@ -44,17 +53,16 @@ export function Files({ api, projectDir }: { api: Api; projectDir: string }) {
     setMessage(null)
   }, [reload])
 
-  const effectiveScope: FileScope = tab === 'keybindings' ? 'user' : scope
-  const scopeFiles = effectiveScope === 'user' ? listing?.user : listing?.project
+  const scopeFiles = fileScope === 'user' ? listing?.user : listing?.project
 
   async function openFile(kind: FileKind, name?: string) {
     setMessage(null)
     try {
       const ref = {
         kind,
-        scope: effectiveScope,
+        scope: fileScope,
         name,
-        projectDir: effectiveScope === 'project' ? projectDir : undefined,
+        projectDir: fileScope === 'project' ? projectDir : undefined,
       }
       const file = await api.fileRead(ref)
       setOpen({ ...ref, content: file.content, hash: file.hash, path: file.path })
@@ -104,7 +112,7 @@ export function Files({ api, projectDir }: { api: Api; projectDir: string }) {
     const name = kind === 'agent' && !newName.endsWith('.md') ? `${newName}.md` : newName
     setOpen({
       kind,
-      scope: effectiveScope,
+      scope: fileScope,
       name,
       content: kind === 'skill' ? `---\nname: ${newName}\ndescription: \n---\n\n` : '',
       hash: null,
@@ -116,13 +124,11 @@ export function Files({ api, projectDir }: { api: Api; projectDir: string }) {
 
   if (!listing) return <p className="dim">Loading…</p>
 
-  const needsProjectDir = effectiveScope === 'project' && !projectDir
-
   return (
     <>
       <h2>Agents &amp; files</h2>
       <div className="scope-picker">
-        {TABS.map(([key, label]) => (
+        {tabs.map(([key, label]) => (
           <button
             key={key}
             className={tab === key ? 'active projectLocal' : ''}
@@ -138,117 +144,95 @@ export function Files({ api, projectDir }: { api: Api; projectDir: string }) {
           </button>
         ))}
       </div>
-      {tab !== 'keybindings' && (
-        <div className="scope-picker">
-          {(['user', 'project'] as const).map((s) => (
-            <button
-              key={s}
-              className={scope === s ? `active ${s}` : ''}
-              onClick={() => {
-                if (!confirmDiscard()) return
-                setScope(s)
-                setOpen(null)
-                setDirty(false)
-              }}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
 
       {message && <div className={`alert ${message.kind}`}>{message.text}</div>}
-      {needsProjectDir ? (
-        <div className="alert">Set a project directory in the sidebar for project-scope files.</div>
-      ) : (
-        <>
-          {tab === 'claudeMd' && (
+      <>
+        {tab === 'claudeMd' && (
+          <div className="toolbar">
+            <button className="ghost" onClick={() => void openFile('claudeMd')}>
+              {scopeFiles?.claudeMd.exists ? 'Open CLAUDE.md' : 'Create CLAUDE.md'}
+            </button>
+            <span className="dim">{scopeFiles?.claudeMd.path}</span>
+          </div>
+        )}
+        {tab === 'keybindings' && (
+          <div className="toolbar">
+            <button className="ghost" onClick={() => void openFile('keybindings')}>
+              {listing.user.keybindings?.exists ? 'Open keybindings.json' : 'Create keybindings.json'}
+            </button>
+            <span className="dim">{listing.user.keybindings?.path}</span>
+          </div>
+        )}
+        {(tab === 'agent' || tab === 'skill') && (
+          <>
+            {(() => {
+              const list = tab === 'agent' ? scopeFiles?.agents : scopeFiles?.skills
+              return list?.length === 0 ? (
+                <p className="dim">None yet.</p>
+              ) : (
+                <table className="kv">
+                  <tbody>
+                    {list?.map((f) => (
+                      <tr key={f.name}>
+                        <td className="path">
+                          <button className="ghost" onClick={() => void openFile(tab, f.name)}>
+                            {f.name}
+                          </button>
+                        </td>
+                        <td className="value dim">{f.path}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+            })()}
             <div className="toolbar">
-              <button className="ghost" onClick={() => void openFile('claudeMd')}>
-                {scopeFiles?.claudeMd.exists ? 'Open CLAUDE.md' : 'Create CLAUDE.md'}
-              </button>
-              <span className="dim">{scopeFiles?.claudeMd.path}</span>
-            </div>
-          )}
-          {tab === 'keybindings' && (
-            <div className="toolbar">
-              <button className="ghost" onClick={() => void openFile('keybindings')}>
-                {listing.user.keybindings?.exists ? 'Open keybindings.json' : 'Create keybindings.json'}
-              </button>
-              <span className="dim">{listing.user.keybindings?.path}</span>
-            </div>
-          )}
-          {(tab === 'agent' || tab === 'skill') && (
-            <>
-              {(() => {
-                const list = tab === 'agent' ? scopeFiles?.agents : scopeFiles?.skills
-                return list?.length === 0 ? (
-                  <p className="dim">None yet.</p>
-                ) : (
-                  <table className="kv">
-                    <tbody>
-                      {list?.map((f) => (
-                        <tr key={f.name}>
-                          <td className="path">
-                            <button className="ghost" onClick={() => void openFile(tab, f.name)}>
-                              {f.name}
-                            </button>
-                          </td>
-                          <td className="value dim">{f.path}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )
-              })()}
-              <div className="toolbar">
-                <input
-                  placeholder={tab === 'agent' ? 'new-agent-name' : 'new-skill-name'}
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                />
-                <button className="ghost" disabled={!newName.trim()} onClick={createNew}>
-                  + New {tab}
-                </button>
-              </div>
-            </>
-          )}
-
-          {open && (
-            <>
-              <p className="dim">
-                {open.path}
-                {dirty ? ' — unsaved changes' : ''}
-              </p>
-              <textarea
-                rows={18}
-                style={{ width: '100%', resize: 'vertical' }}
-                value={open.content}
-                disabled={busy}
-                onChange={(e) => {
-                  setOpen((prev) => (prev ? { ...prev, content: e.target.value } : prev))
-                  setDirty(true)
-                }}
+              <input
+                placeholder={tab === 'agent' ? 'new-agent-name' : 'new-skill-name'}
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
               />
-              <div className="toolbar">
-                <button className="action" disabled={busy || !dirty} onClick={() => void save()}>
-                  Save
-                </button>
-                <button
-                  className="ghost"
-                  onClick={() => {
-                    if (!confirmDiscard()) return
-                    setOpen(null)
-                    setDirty(false)
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-            </>
-          )}
-        </>
-      )}
+              <button className="ghost" disabled={!newName.trim()} onClick={createNew}>
+                + New {tab}
+              </button>
+            </div>
+          </>
+        )}
+
+        {open && (
+          <>
+            <p className="dim">
+              {open.path}
+              {dirty ? ' — unsaved changes' : ''}
+            </p>
+            <textarea
+              rows={18}
+              style={{ width: '100%', resize: 'vertical' }}
+              value={open.content}
+              disabled={busy}
+              onChange={(e) => {
+                setOpen((prev) => (prev ? { ...prev, content: e.target.value } : prev))
+                setDirty(true)
+              }}
+            />
+            <div className="toolbar">
+              <button className="action" disabled={busy || !dirty} onClick={() => void save()}>
+                Save
+              </button>
+              <button
+                className="ghost"
+                onClick={() => {
+                  if (!confirmDiscard()) return
+                  setOpen(null)
+                  setDirty(false)
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </>
+        )}
+      </>
     </>
   )
 }

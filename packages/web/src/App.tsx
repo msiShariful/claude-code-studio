@@ -90,7 +90,12 @@ export function App({ token }: { token: string | null }) {
             onJumpConsumed={onJumpConsumed}
           />
         )}
-        {view === 'files' && <Files api={api} projectDir={projectDir} />}
+        {view === 'files' && (
+          <Files
+            api={api}
+            workspace={projectDir ? { kind: 'project', dir: projectDir } : { kind: 'global' }}
+          />
+        )}
         {view === 'hooks' && (
           <Hooks
             api={api}
