@@ -14,6 +14,7 @@ function describeTarget(config: Record<string, unknown>): string {
 export function Mcp({ api, projectDir }: { api: Api; projectDir: string }) {
   const [data, setData] = useState<McpListDto | null>(null)
   const [adding, setAdding] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({
     name: '',
     scope: 'user' as McpScope,
@@ -48,7 +49,8 @@ export function Mcp({ api, projectDir }: { api: Api; projectDir: string }) {
     if (form.transport === 'stdio') {
       base.command = form.command
       const args = form.args.trim()
-      if (args) base.args = args.split(/\s+/)
+      // Always overwrite: extra-config JSON must not smuggle args past a blank field.
+      base.args = args ? args.split(/\s+/) : []
     } else {
       base.url = form.url
     }
@@ -57,12 +59,20 @@ export function Mcp({ api, projectDir }: { api: Api; projectDir: string }) {
 
   async function add() {
     setMessage(null)
+    if (form.extra.trim()) {
+      const extra = parseEditValue(form.extra)
+      if (typeof extra !== 'object' || extra === null || Array.isArray(extra)) {
+        setMessage({ kind: 'error', text: 'Extra config must be a JSON object' })
+        return
+      }
+    }
+    setBusy(true)
     try {
       const result = await api.mcpAdd({
         name: form.name.trim(),
         scope: form.scope,
         config: buildConfig(),
-        projectDir: form.scope === 'user' ? undefined : projectDir,
+        projectDir: form.scope === 'user' ? undefined : projectDir || undefined,
       })
       setMessage({
         kind: 'ok',
@@ -72,25 +82,30 @@ export function Mcp({ api, projectDir }: { api: Api; projectDir: string }) {
             : `Added by editing the file directly (claude CLI not found) — a backup was kept.`,
       })
       setAdding(false)
-      setForm({ ...form, name: '', command: '', args: '', url: '', extra: '' })
+      setForm((prev) => ({ ...prev, name: '', command: '', args: '', url: '', extra: '' }))
       await reload()
     } catch (e) {
       setMessage({ kind: 'error', text: (e as Error).message })
+    } finally {
+      setBusy(false)
     }
   }
 
   async function remove(name: string, scope: McpScope) {
     if (!window.confirm(`Remove MCP server "${name}" (${scope} scope)?`)) return
     setMessage(null)
+    setBusy(true)
     try {
       await api.mcpRemove({
         name,
         scope,
-        projectDir: scope === 'user' ? undefined : projectDir,
+        projectDir: scope === 'user' ? undefined : projectDir || undefined,
       })
       await reload()
     } catch (e) {
       setMessage({ kind: 'error', text: (e as Error).message })
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -133,7 +148,7 @@ export function Mcp({ api, projectDir }: { api: Api; projectDir: string }) {
                 <td className="dim">{String(s.config.type ?? 'stdio')}</td>
                 <td className="value">{describeTarget(s.config)}</td>
                 <td>
-                  <button className="ghost" onClick={() => void remove(s.name, s.scope)}>
+                  <button className="ghost" disabled={busy} onClick={() => void remove(s.name, s.scope)}>
                     Remove
                   </button>
                 </td>
@@ -212,6 +227,7 @@ export function Mcp({ api, projectDir }: { api: Api; projectDir: string }) {
             <button
               className="action"
               disabled={
+                busy ||
                 !form.name.trim() ||
                 needsProjectDir ||
                 (form.transport === 'stdio' ? !form.command.trim() : !form.url.trim())

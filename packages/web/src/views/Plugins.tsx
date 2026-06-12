@@ -21,15 +21,17 @@ export function Plugins({ api }: { api: Api }) {
     void reload()
   }, [reload])
 
-  async function run(fn: () => Promise<unknown>, okText: string) {
+  async function run(fn: () => Promise<unknown>, okText: string): Promise<boolean> {
     setBusy(true)
     setMessage(null)
     try {
       await fn()
       setMessage({ kind: 'ok', text: okText })
       await reload()
+      return true
     } catch (e) {
       setMessage({ kind: 'error', text: (e as Error).message })
+      return false
     } finally {
       setBusy(false)
     }
@@ -122,7 +124,10 @@ export function Plugins({ api }: { api: Api }) {
           className="action"
           disabled={busy || !installId.trim()}
           onClick={() =>
-            void run(() => api.pluginAction('install', installId.trim()), `Installed ${installId}`)
+            void run(
+              () => api.pluginAction('install', installId.trim()),
+              `Installed ${installId}`,
+            ).then((ok) => ok && setInstallId(''))
           }
         >
           Install
@@ -181,7 +186,7 @@ export function Plugins({ api }: { api: Api }) {
             void run(
               () => api.marketplaceAction('add', marketplaceSrc.trim()),
               `Added marketplace`,
-            )
+            ).then((ok) => ok && setMarketplaceSrc(''))
           }
         >
           Add marketplace
