@@ -125,6 +125,33 @@ export interface PluginsListDto {
   marketplaces: MarketplaceDto[]
 }
 
+export type FileKind = 'claudeMd' | 'keybindings' | 'agent' | 'skill'
+export type FileScope = 'user' | 'project'
+
+export interface NamedFileDto {
+  name: string
+  path: string
+}
+
+export interface ScopeFilesDto {
+  claudeMd: { path: string; exists: boolean }
+  keybindings?: { path: string; exists: boolean }
+  agents: NamedFileDto[]
+  skills: NamedFileDto[]
+}
+
+export interface FilesListingDto {
+  user: ScopeFilesDto
+  project?: ScopeFilesDto
+}
+
+export interface FileContentDto {
+  path: string
+  exists: boolean
+  content: string
+  hash: string | null
+}
+
 export class Api {
   constructor(private readonly token: string) {}
 
@@ -205,5 +232,35 @@ export class Api {
       method: 'POST',
       body: JSON.stringify({ action, value }),
     })
+  }
+
+  files(projectDir?: string): Promise<FilesListingDto> {
+    const q = projectDir ? `?projectDir=${encodeURIComponent(projectDir)}` : ''
+    return this.request(`/api/files${q}`)
+  }
+
+  fileRead(ref: {
+    kind: FileKind
+    scope: FileScope
+    name?: string
+    projectDir?: string
+  }): Promise<FileContentDto> {
+    const params = new URLSearchParams()
+    params.set('kind', ref.kind)
+    params.set('scope', ref.scope)
+    if (ref.name) params.set('name', ref.name)
+    if (ref.projectDir) params.set('projectDir', ref.projectDir)
+    return this.request(`/api/files/read?${params.toString()}`)
+  }
+
+  fileSave(body: {
+    kind: FileKind
+    scope: FileScope
+    name?: string
+    projectDir?: string
+    content: string
+    expectedHash: string | null
+  }): Promise<{ saved: boolean; path: string; hash: string }> {
+    return this.request('/api/files/save', { method: 'POST', body: JSON.stringify(body) })
   }
 }
