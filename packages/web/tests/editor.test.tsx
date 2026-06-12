@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Api } from '../src/api.js'
 import { Editor } from '../src/views/Editor.js'
@@ -54,5 +54,25 @@ describe('Editor view', () => {
 
     expect(await screen.findByText('+  "model": "sonnet"', { normalizer: (s) => s })).toBeDefined()
     expect(screen.getByText('Apply change')).toBeDefined()
+  })
+
+  it('discards a previewed diff when an edit row is deleted', async () => {
+    vi.stubGlobal('fetch', stubFetch())
+    const { container } = render(<Editor api={new Api('t')} projectDir="" />)
+    const view = within(container)
+
+    await view.findByText('{"model": "opus"}')
+
+    fireEvent.change(view.getByPlaceholderText('model or env.FOO'), {
+      target: { value: 'model' },
+    })
+    fireEvent.change(view.getByPlaceholderText('"sonnet" or {"a": 1} or plain text'), {
+      target: { value: '"sonnet"' },
+    })
+    fireEvent.click(view.getByText('Preview diff'))
+    await view.findByText('Apply change')
+
+    fireEvent.click(view.getByText('×'))
+    expect(view.queryByText('Apply change')).toBeNull()
   })
 })

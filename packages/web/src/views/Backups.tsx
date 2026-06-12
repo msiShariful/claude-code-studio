@@ -9,7 +9,10 @@ export function Backups({ api }: { api: Api }) {
     api
       .backups()
       .then((b) => setBackups(b.backups))
-      .catch((e: Error) => setMessage({ kind: 'error', text: e.message }))
+      .catch((e: Error) => {
+        setMessage({ kind: 'error', text: e.message })
+        setBackups([])
+      })
   }, [api])
 
   useEffect(() => reload(), [reload])

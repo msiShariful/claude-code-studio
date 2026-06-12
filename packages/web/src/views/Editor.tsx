@@ -20,16 +20,17 @@ export function Editor({ api, projectDir }: { api: Api; projectDir: string }) {
   const [pending, setPending] = useState<PendingChangeDto | null>(null)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
-  const reload = useCallback(() => {
+  const reload = useCallback(async () => {
     setData(null)
-    api
-      .settings(projectDir || undefined)
-      .then(setData)
-      .catch((e: Error) => setMessage({ kind: 'error', text: e.message }))
+    try {
+      setData(await api.settings(projectDir || undefined))
+    } catch (e) {
+      setMessage({ kind: 'error', text: (e as Error).message })
+    }
   }, [api, projectDir])
 
   useEffect(() => {
-    reload()
+    void reload()
     setPending(null)
     setMessage(null)
   }, [reload])
@@ -72,18 +73,18 @@ export function Editor({ api, projectDir }: { api: Api; projectDir: string }) {
         edits: buildEdits(),
         expectedHash: pending.expectedHash,
       })
-      setMessage({ kind: 'ok', text: 'Change applied. A backup of the previous file was kept.' })
       setPending(null)
       setRows([EMPTY_ROW])
-      reload()
+      await reload()
+      setMessage({ kind: 'ok', text: 'Change applied. A backup of the previous file was kept.' })
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
+        setPending(null)
+        await reload()
         setMessage({
           kind: 'error',
           text: 'The file changed on disk since the preview — re-preview to see the current state.',
         })
-        setPending(null)
-        reload()
       } else {
         setMessage({ kind: 'error', text: (e as Error).message })
       }
@@ -106,6 +107,7 @@ export function Editor({ api, projectDir }: { api: Api; projectDir: string }) {
             onClick={() => {
               setScope(s)
               setPending(null)
+              setRows([EMPTY_ROW])
               setMessage(null)
             }}
           >
@@ -154,7 +156,10 @@ export function Editor({ api, projectDir }: { api: Api; projectDir: string }) {
                   </label>
                   <button
                     className="ghost"
-                    onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}
+                    onClick={() => {
+                      setRows((rs) => rs.filter((_, j) => j !== i))
+                      setPending(null)
+                    }}
                   >
                     ×
                   </button>
