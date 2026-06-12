@@ -56,6 +56,12 @@ export interface HealthDto {
   cli: { found: boolean; version?: string }
 }
 
+export interface ProjectDto {
+  dir: string
+  name: string
+  exists: boolean
+}
+
 const TOKEN_KEY = 'ccs-token'
 
 interface Windowish {
@@ -172,6 +178,11 @@ export class Api {
 
   health(): Promise<HealthDto> {
     return this.request('/api/health')
+  }
+
+  listProjects(extra: string[] = []): Promise<{ projects: ProjectDto[] }> {
+    const q = extra.length > 0 ? `?extra=${encodeURIComponent(extra.join(','))}` : ''
+    return this.request(`/api/projects${q}`)
   }
 
   settings(projectDir?: string): Promise<SettingsResponse> {

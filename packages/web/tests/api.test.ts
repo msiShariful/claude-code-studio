@@ -62,4 +62,22 @@ describe('Api', () => {
     expect((err as ApiError).status).toBe(409)
     expect((err as ApiError).body.code).toBe('WRITE_CONFLICT')
   })
+
+  it('lists projects and encodes extras into one query param', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ projects: [] }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    await new Api('tok').listProjects(['/a b', '/c'])
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/projects?extra=${encodeURIComponent('/a b,/c')}`)
+  })
+
+  it('omits the extra param when there are no extras', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ projects: [] }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    await new Api('tok').listProjects([])
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/projects')
+  })
 })
