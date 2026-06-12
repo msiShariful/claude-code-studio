@@ -7,6 +7,22 @@ import { listBackups } from '@claude-code-studio/core'
 import { auth, fixture } from './helpers.js'
 
 describe('/api/files', () => {
+  it('requires auth on every files route', async () => {
+    const { app } = await fixture()
+    for (const inject of [
+      { url: '/api/files' },
+      { url: '/api/files/read?kind=claudeMd&scope=user' },
+      {
+        method: 'POST' as const,
+        url: '/api/files/save',
+        payload: { kind: 'claudeMd', scope: 'user', content: 'x', expectedHash: null },
+      },
+    ]) {
+      const res = await app.inject(inject)
+      expect(res.statusCode).toBe(401)
+    }
+  })
+
   it('lists files for the user scope (and project when projectDir given)', async () => {
     const { app, globalPaths } = await fixture()
     await mkdir(globalPaths.agentsDir, { recursive: true })

@@ -14,7 +14,8 @@ import type { FastifyInstance } from 'fastify'
 import { isAbsolute } from 'node:path'
 import type { ServerContext } from '../server.js'
 
-const KINDS: ReadonlySet<string> = new Set(['claudeMd', 'keybindings', 'agent', 'skill'])
+const ALL_KINDS = ['claudeMd', 'keybindings', 'agent', 'skill'] as const satisfies readonly FileKind[]
+const KINDS: ReadonlySet<string> = new Set(ALL_KINDS)
 const SCOPES: ReadonlySet<string> = new Set(['user', 'project'])
 
 interface RefQuery {
@@ -84,6 +85,15 @@ export function filesRoutes(app: FastifyInstance, ctx: ServerContext): void {
       )
     } catch (err) {
       return reply.code(400).send({ error: (err as Error).message })
+    }
+    // Pre-check the hash before backing up (mirrors applyChange) so a
+    // rejected conflict doesn't leave a stray backup on every retry.
+    const current = await readTextFile(path)
+    const currentHash = current.exists ? current.hash! : null
+    if (currentHash !== body.expectedHash) {
+      return reply
+        .code(409)
+        .send({ error: `File changed on disk since it was read: ${path}`, code: 'WRITE_CONFLICT' })
     }
     try {
       await backupFile(path, ctx.backupsRoot)
