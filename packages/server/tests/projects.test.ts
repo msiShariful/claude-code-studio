@@ -61,4 +61,15 @@ describe('GET /api/projects', () => {
     const res = await app.inject({ method: 'GET', url: '/api/projects', headers: auth })
     expect(res.json()).toEqual({ projects: [] })
   })
+
+  it('treats a repeated ?extra query param (array) as absent — no crash', async () => {
+    const { app } = await fixture()
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/projects?extra=a&extra=b',
+      headers: auth,
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ projects: [] })
+  })
 })

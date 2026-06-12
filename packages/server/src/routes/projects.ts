@@ -14,15 +14,16 @@ interface ProjectsQuery {
  * extras only ever hit existsSync — never a file read or write.
  */
 export function projectsRoutes(app: FastifyInstance, ctx: ServerContext): void {
-  app.get('/api/projects', async (req) => {
-    const { extra } = req.query as ProjectsQuery
-    const state = await readJsonFile(ctx.globalPaths.claudeJson)
+  app.get<{ Querystring: ProjectsQuery }>('/api/projects', async (req) => {
+    const { extra } = req.query
+    const extraRaw = typeof extra === 'string' ? extra : ''
+    const state = await readJsonFile<Record<string, unknown>>(ctx.globalPaths.claudeJson)
     const projectsValue = state.value?.projects
     const known =
       typeof projectsValue === 'object' && projectsValue !== null && !Array.isArray(projectsValue)
         ? Object.keys(projectsValue)
         : []
-    const extras = (extra ?? '')
+    const extras = extraRaw
       .split(',')
       .map((s) => s.trim())
       .filter((s) => s !== '' && !known.includes(s))
