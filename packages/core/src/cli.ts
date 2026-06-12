@@ -11,6 +11,13 @@ export interface CliRunResult {
   stderr: string
 }
 
+/** Injectable command runner so callers (and tests) can substitute runCommand. */
+export type CliRunner = (
+  bin: string,
+  args: string[],
+  opts?: { cwd?: string; timeoutMs?: number; maxBuffer?: number },
+) => Promise<CliRunResult>
+
 /**
  * Runs a binary via execFile (never a shell — arguments cannot be injected).
  * Non-zero exit codes resolve normally; missing binaries and timeouts throw.
