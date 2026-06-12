@@ -3,10 +3,10 @@
 A local GUI for managing Claude Code settings — config files, MCP servers,
 plugins, hooks, agents, skills, and CLAUDE.md — without living in the terminal.
 
-> Status: early development. The config engine (`packages/core`), the
-> localhost API server + launcher (`packages/server`), and the web UI core
-> (`packages/web` — dashboard, effective settings, editor with diff preview,
-> backups) are done. Next up: MCP server and plugin management.
+> Status: early development. Config engine, localhost API server + launcher,
+> web UI core (dashboard, effective settings, editor with diff preview,
+> backups), and MCP + plugin management are done. Next up: hooks, agents,
+> skills, and CLAUDE.md editors.
 
 ## Planned usage
 
