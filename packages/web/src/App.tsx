@@ -1,3 +1,74 @@
-export function App() {
-  return <h1 className="wordmark">Claude Code Studio</h1>
+import { useMemo, useState } from 'react'
+import { Api } from './api.js'
+import { Backups } from './views/Backups.js'
+import { Dashboard } from './views/Dashboard.js'
+import { Editor } from './views/Editor.js'
+import { Effective } from './views/Effective.js'
+
+const VIEWS = [
+  ['dashboard', 'Dashboard'],
+  ['effective', 'Effective settings'],
+  ['editor', 'Editor'],
+  ['backups', 'Backups'],
+] as const
+
+type ViewKey = (typeof VIEWS)[number][0]
+
+export function App({ token }: { token: string | null }) {
+  const [view, setView] = useState<ViewKey>('dashboard')
+  const [projectDir, setProjectDir] = useState(
+    () => window.localStorage.getItem('ccs-project-dir') ?? '',
+  )
+  const api = useMemo(() => (token ? new Api(token) : null), [token])
+
+  if (!api) {
+    return (
+      <main className="gate">
+        <h1 className="wordmark">Claude Code Studio</h1>
+        <p>
+          No session token found. Start the app from your terminal with{' '}
+          <code>npx claude-code-studio</code> and open the URL it prints — the token rides along in
+          that URL.
+        </p>
+      </main>
+    )
+  }
+
+  function updateProjectDir(value: string) {
+    setProjectDir(value)
+    window.localStorage.setItem('ccs-project-dir', value)
+  }
+
+  return (
+    <div className="layout">
+      <aside className="sidebar">
+        <h1 className="wordmark">Claude Code Studio</h1>
+        <nav>
+          {VIEWS.map(([key, label]) => (
+            <button
+              key={key}
+              className={view === key ? 'nav-item active' : 'nav-item'}
+              onClick={() => setView(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+        <label className="project-dir">
+          <span className="dim">Project directory (optional)</span>
+          <input
+            value={projectDir}
+            placeholder="/path/to/project"
+            onChange={(e) => updateProjectDir(e.target.value)}
+          />
+        </label>
+      </aside>
+      <main className="content">
+        {view === 'dashboard' && <Dashboard api={api} projectDir={projectDir} />}
+        {view === 'effective' && <Effective api={api} projectDir={projectDir} />}
+        {view === 'editor' && <Editor api={api} projectDir={projectDir} />}
+        {view === 'backups' && <Backups api={api} />}
+      </main>
+    </div>
+  )
 }
