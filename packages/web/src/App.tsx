@@ -91,7 +91,13 @@ export function App({ token }: { token: string | null }) {
           />
         )}
         {view === 'files' && <Files api={api} projectDir={projectDir} />}
-        {view === 'hooks' && <Hooks api={api} projectDir={projectDir} onEdit={jumpToEditor} />}
+        {view === 'hooks' && (
+          <Hooks
+            api={api}
+            workspace={projectDir ? { kind: 'project', dir: projectDir } : { kind: 'global' }}
+            onEdit={jumpToEditor}
+          />
+        )}
         {view === 'mcp' && <Mcp api={api} projectDir={projectDir} />}
         {view === 'plugins' && <Plugins api={api} />}
         {view === 'backups' && <Backups api={api} />}
