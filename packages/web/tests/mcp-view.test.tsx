@@ -18,20 +18,29 @@ describe('Mcp view', () => {
     vi.unstubAllGlobals()
   })
 
-  it('lists servers with scope badges and previews the add form', async () => {
+  it('global workspace shows only user-scope servers', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response(JSON.stringify(LIST), { status: 200 })),
     )
-    render(<Mcp api={new Api('t')} projectDir="/work/app" />)
+    render(<Mcp api={new Api('t')} workspace={{ kind: 'global' }} />)
     expect(await screen.findByText('figma')).toBeDefined()
-    expect(screen.getByText('playwright')).toBeDefined()
-    expect(screen.getByText('user')).toBeDefined()
-    expect(screen.getByText('local')).toBeDefined()
-    expect(screen.getByText('https://x/mcp')).toBeDefined()
+    expect(screen.queryByText('playwright')).toBeNull()
+  })
+
+  it('project workspace shows only project-side servers and offers local/project scopes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(LIST), { status: 200 })),
+    )
+    render(<Mcp api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} />)
+    expect(await screen.findByText('playwright')).toBeDefined()
+    expect(screen.queryByText('figma')).toBeNull()
 
     fireEvent.click(screen.getByText('+ Add server'))
-    expect(screen.getByPlaceholderText('server-name')).toBeDefined()
+    const scopeSelect = screen.getByDisplayValue(/local \(this project, private\)/)
+    expect(scopeSelect).toBeDefined()
+    expect(screen.queryByText('user (all projects)')).toBeNull()
   })
 
   it('does not let extra config smuggle args past a blank args field', async () => {
@@ -42,7 +51,7 @@ describe('Mcp view', () => {
       return Promise.resolve(new Response(JSON.stringify(LIST), { status: 200 }))
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<Mcp api={new Api('t')} projectDir="" />)
+    render(<Mcp api={new Api('t')} workspace={{ kind: 'global' }} />)
     await screen.findByText('figma')
 
     fireEvent.click(screen.getByText('+ Add server'))
@@ -60,5 +69,6 @@ describe('Mcp view', () => {
     const addCall = fetchMock.mock.calls.find(([u]) => u === '/api/mcp/add')!
     const body = JSON.parse(addCall[1].body)
     expect(body.config.args).toEqual([])
+    expect(body.scope).toBe('user')
   })
 })

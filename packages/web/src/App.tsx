@@ -103,7 +103,12 @@ export function App({ token }: { token: string | null }) {
             onEdit={jumpToEditor}
           />
         )}
-        {view === 'mcp' && <Mcp api={api} projectDir={projectDir} />}
+        {view === 'mcp' && (
+          <Mcp
+            api={api}
+            workspace={projectDir ? { kind: 'project', dir: projectDir } : { kind: 'global' }}
+          />
+        )}
         {view === 'plugins' && <Plugins api={api} />}
         {view === 'backups' && <Backups api={api} />}
       </main>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Api, McpListDto, McpScope } from '../api.js'
 import { parseEditValue } from '../utils.js'
+import { workspaceProjectDir, type Workspace } from '../workspace.js'
 
 const TRANSPORTS = ['stdio', 'http', 'sse'] as const
 type Transport = (typeof TRANSPORTS)[number]
@@ -11,13 +12,14 @@ function describeTarget(config: Record<string, unknown>): string {
   return [config.command, args].filter(Boolean).join(' ')
 }
 
-export function Mcp({ api, projectDir }: { api: Api; projectDir: string }) {
+export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
+  const projectDir = workspaceProjectDir(workspace)
   const [data, setData] = useState<McpListDto | null>(null)
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({
     name: '',
-    scope: 'user' as McpScope,
+    scope: (workspace.kind === 'global' ? 'user' : 'local') as McpScope,
     transport: 'stdio' as Transport,
     command: '',
     args: '',
@@ -111,7 +113,9 @@ export function Mcp({ api, projectDir }: { api: Api; projectDir: string }) {
 
   if (!data) return <p className="dim">Loading…</p>
 
-  const needsProjectDir = form.scope !== 'user' && !projectDir
+  const visibleServers = data.servers.filter((s) =>
+    workspace.kind === 'global' ? s.scope === 'user' : s.scope !== 'user',
+  )
 
   return (
     <>
@@ -123,8 +127,12 @@ export function Mcp({ api, projectDir }: { api: Api; projectDir: string }) {
       ))}
       {message && <div className={`alert ${message.kind}`}>{message.text}</div>}
 
-      {data.servers.length === 0 ? (
-        <p className="dim">No MCP servers configured{projectDir ? '' : ' (set a project directory to see local/project scopes)'}.</p>
+      {visibleServers.length === 0 ? (
+        <p className="dim">
+          {workspace.kind === 'global'
+            ? 'No user-scope MCP servers configured.'
+            : 'No MCP servers configured for this project.'}
+        </p>
       ) : (
         <table className="kv">
           <thead>
@@ -137,7 +145,7 @@ export function Mcp({ api, projectDir }: { api: Api; projectDir: string }) {
             </tr>
           </thead>
           <tbody>
-            {data.servers.map((s) => (
+            {visibleServers.map((s) => (
               <tr key={`${s.scope}:${s.name}`}>
                 <td className="path">{s.name}</td>
                 <td>
@@ -166,20 +174,21 @@ export function Mcp({ api, projectDir }: { api: Api; projectDir: string }) {
 
       {adding && (
         <div className="card">
-          <div className="edit-row" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+          <div className="edit-row" style={{ gridTemplateColumns: workspace.kind === 'project' ? '1fr 1fr 1fr' : '1fr 1fr' }}>
             <input
               placeholder="server-name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
-            <select
-              value={form.scope}
-              onChange={(e) => setForm({ ...form, scope: e.target.value as McpScope })}
-            >
-              <option value="user">user (all projects)</option>
-              <option value="local">local (this project, private)</option>
-              <option value="project">project (shared via .mcp.json)</option>
-            </select>
+            {workspace.kind === 'project' && (
+              <select
+                value={form.scope}
+                onChange={(e) => setForm({ ...form, scope: e.target.value as McpScope })}
+              >
+                <option value="local">local (this project, private)</option>
+                <option value="project">project (shared via .mcp.json)</option>
+              </select>
+            )}
             <select
               value={form.transport}
               onChange={(e) => setForm({ ...form, transport: e.target.value as Transport })}
@@ -220,16 +229,12 @@ export function Mcp({ api, projectDir }: { api: Api; projectDir: string }) {
               onChange={(e) => setForm({ ...form, extra: e.target.value })}
             />
           </div>
-          {needsProjectDir && (
-            <div className="alert">Set a project directory in the sidebar for this scope.</div>
-          )}
           <div className="toolbar">
             <button
               className="action"
               disabled={
                 busy ||
                 !form.name.trim() ||
-                needsProjectDir ||
                 (form.transport === 'stdio' ? !form.command.trim() : !form.url.trim())
               }
               onClick={() => void add()}
