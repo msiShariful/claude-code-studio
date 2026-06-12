@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Api } from '../src/api.js'
 import { Plugins } from '../src/views/Plugins.js'
@@ -19,7 +19,10 @@ const LIST = {
 }
 
 describe('Plugins view', () => {
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
 
   it('renders plugins and marketplaces', async () => {
     vi.stubGlobal(
