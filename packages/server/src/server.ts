@@ -9,6 +9,7 @@ import { filesRoutes } from './routes/files.js'
 import { healthRoutes } from './routes/health.js'
 import { mcpRoutes } from './routes/mcp.js'
 import { pluginsRoutes } from './routes/plugins.js'
+import { projectsRoutes } from './routes/projects.js'
 import { settingsRoutes } from './routes/settings.js'
 
 export interface BuildOptions {
@@ -70,6 +71,7 @@ export function buildServer(opts: BuildOptions): FastifyInstance {
     mcpRoutes(api, ctx)
     pluginsRoutes(api, ctx)
     filesRoutes(api, ctx)
+    projectsRoutes(api, ctx)
   })
   return app
 }
