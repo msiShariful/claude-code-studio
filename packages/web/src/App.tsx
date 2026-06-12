@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Api } from './api.js'
 import { Backups } from './views/Backups.js'
 import { Dashboard } from './views/Dashboard.js'
@@ -30,10 +30,12 @@ export function App({ token }: { token: string | null }) {
   const [editorJump, setEditorJump] = useState<EditorJump | null>(null)
   const api = useMemo(() => (token ? new Api(token) : null), [token])
 
-  function jumpToEditor(scope: EditorJump['scope'], path: string) {
+  const jumpToEditor = useCallback((scope: EditorJump['scope'], path: string) => {
     setEditorJump({ scope, path })
     setView('editor')
-  }
+  }, [])
+
+  const onJumpConsumed = useCallback(() => setEditorJump(null), [])
 
   if (!api) {
     return (
@@ -85,7 +87,7 @@ export function App({ token }: { token: string | null }) {
             api={api}
             projectDir={projectDir}
             jump={editorJump}
-            onJumpConsumed={() => setEditorJump(null)}
+            onJumpConsumed={onJumpConsumed}
           />
         )}
         {view === 'files' && <Files api={api} projectDir={projectDir} />}

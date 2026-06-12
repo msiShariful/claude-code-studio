@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Api, SettingsResponse } from '../api.js'
 import { flattenLeaves } from '../utils.js'
+import type { EditableScope } from './Editor.js'
 
 export function Effective({
   api,
@@ -9,7 +10,7 @@ export function Effective({
 }: {
   api: Api
   projectDir: string
-  onEdit?: (scope: 'user' | 'project' | 'projectLocal', path: string) => void
+  onEdit?: (scope: EditableScope, path: string) => void
 }) {
   const [data, setData] = useState<SettingsResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -55,7 +56,7 @@ export function Effective({
                   title={editable ? 'Click to edit this value at its source scope' : undefined}
                   onClick={
                     editable && onEdit
-                      ? () => onEdit(leaf.source as 'user' | 'project' | 'projectLocal', leaf.path)
+                      ? () => onEdit(leaf.source as EditableScope, leaf.path)
                       : undefined
                   }
                 >

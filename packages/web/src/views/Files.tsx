@@ -77,10 +77,10 @@ export function Files({ api, projectDir }: { api: Api; projectDir: string }) {
         content: open.content,
         expectedHash: open.hash,
       })
-      setOpen({ ...open, hash: result.hash })
+      await reload()
+      setOpen((prev) => (prev ? { ...prev, hash: result.hash } : prev))
       setDirty(false)
       setMessage({ kind: 'ok', text: 'Saved. The previous version was backed up.' })
-      await reload()
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
         setMessage({
@@ -93,6 +93,10 @@ export function Files({ api, projectDir }: { api: Api; projectDir: string }) {
     } finally {
       setBusy(false)
     }
+  }
+
+  function confirmDiscard(): boolean {
+    return !dirty || window.confirm('You have unsaved changes. Discard them?')
   }
 
   function createNew() {
@@ -123,8 +127,10 @@ export function Files({ api, projectDir }: { api: Api; projectDir: string }) {
             key={key}
             className={tab === key ? 'active projectLocal' : ''}
             onClick={() => {
+              if (!confirmDiscard()) return
               setTab(key)
               setOpen(null)
+              setDirty(false)
               setMessage(null)
             }}
           >
@@ -139,8 +145,10 @@ export function Files({ api, projectDir }: { api: Api; projectDir: string }) {
               key={s}
               className={scope === s ? `active ${s}` : ''}
               onClick={() => {
+                if (!confirmDiscard()) return
                 setScope(s)
                 setOpen(null)
+                setDirty(false)
               }}
             >
               {s}
@@ -172,24 +180,27 @@ export function Files({ api, projectDir }: { api: Api; projectDir: string }) {
           )}
           {(tab === 'agent' || tab === 'skill') && (
             <>
-              {(tab === 'agent' ? scopeFiles?.agents : scopeFiles?.skills)?.length === 0 ? (
-                <p className="dim">None yet.</p>
-              ) : (
-                <table className="kv">
-                  <tbody>
-                    {(tab === 'agent' ? scopeFiles?.agents : scopeFiles?.skills)?.map((f) => (
-                      <tr key={f.name}>
-                        <td className="path">
-                          <button className="ghost" onClick={() => void openFile(tab, f.name)}>
-                            {f.name}
-                          </button>
-                        </td>
-                        <td className="value dim">{f.path}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+              {(() => {
+                const list = tab === 'agent' ? scopeFiles?.agents : scopeFiles?.skills
+                return list?.length === 0 ? (
+                  <p className="dim">None yet.</p>
+                ) : (
+                  <table className="kv">
+                    <tbody>
+                      {list?.map((f) => (
+                        <tr key={f.name}>
+                          <td className="path">
+                            <button className="ghost" onClick={() => void openFile(tab, f.name)}>
+                              {f.name}
+                            </button>
+                          </td>
+                          <td className="value dim">{f.path}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              })()}
               <div className="toolbar">
                 <input
                   placeholder={tab === 'agent' ? 'new-agent-name' : 'new-skill-name'}
@@ -213,8 +224,9 @@ export function Files({ api, projectDir }: { api: Api; projectDir: string }) {
                 rows={18}
                 style={{ width: '100%', resize: 'vertical' }}
                 value={open.content}
+                disabled={busy}
                 onChange={(e) => {
-                  setOpen({ ...open, content: e.target.value })
+                  setOpen((prev) => (prev ? { ...prev, content: e.target.value } : prev))
                   setDirty(true)
                 }}
               />
@@ -222,7 +234,14 @@ export function Files({ api, projectDir }: { api: Api; projectDir: string }) {
                 <button className="action" disabled={busy || !dirty} onClick={() => void save()}>
                   Save
                 </button>
-                <button className="ghost" onClick={() => setOpen(null)}>
+                <button
+                  className="ghost"
+                  onClick={() => {
+                    if (!confirmDiscard()) return
+                    setOpen(null)
+                    setDirty(false)
+                  }}
+                >
                   Close
                 </button>
               </div>

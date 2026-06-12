@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Api, SettingsResponse, SettingsScope } from '../api.js'
+import type { EditableScope } from './Editor.js'
 
 const HOOK_EVENTS: ReadonlyArray<[string, string]> = [
   ['PreToolUse', 'Runs before a tool call; can block or modify it.'],
@@ -12,8 +13,6 @@ const HOOK_EVENTS: ReadonlyArray<[string, string]> = [
   ['SessionStart', 'Runs when a session starts or resumes.'],
   ['SessionEnd', 'Runs when a session ends.'],
 ]
-
-type EditableScope = 'user' | 'project' | 'projectLocal'
 
 export function Hooks({
   api,
@@ -45,10 +44,6 @@ export function Hooks({
     return (hooks as Record<string, unknown>)[event]
   }
 
-  const editableScopes = data.entries
-    .filter((e) => e.editable)
-    .map((e) => e.scope) as EditableScope[]
-
   return (
     <>
       <h2>Hooks</h2>
@@ -57,8 +52,8 @@ export function Hooks({
         of your settings files. Treat them like code you ship to yourself: review every command.
       </p>
       {HOOK_EVENTS.map(([event, description]) => {
-        const configured = editableScopes
-          .map((scope) => ({ scope, config: hooksFor(scope, event) }))
+        const configured = data.entries
+          .map((entry) => ({ scope: entry.scope, editable: entry.editable, config: hooksFor(entry.scope, event) }))
           .filter((c) => c.config !== undefined)
         return (
           <div className="card" key={event} style={{ marginBottom: '1rem' }}>
@@ -82,18 +77,27 @@ export function Hooks({
             )}
             {onEdit && (
               <div className="toolbar" style={{ margin: 0 }}>
-                {(configured.length > 0
-                  ? configured.map((c) => c.scope)
-                  : (['user'] as EditableScope[])
-                ).map((scope) => (
-                  <button
-                    key={scope}
-                    className="ghost"
-                    onClick={() => onEdit(scope, `hooks.${event}`)}
-                  >
-                    Edit in Editor
-                  </button>
-                ))}
+                {configured.length > 0
+                  ? configured
+                      .filter((c) => c.editable)
+                      .map((c) => (
+                        <button
+                          key={c.scope}
+                          className="ghost"
+                          onClick={() => onEdit(c.scope as EditableScope, `hooks.${event}`)}
+                        >
+                          Edit in Editor
+                        </button>
+                      ))
+                  : (
+                    <button
+                      className="ghost"
+                      title="Adds the hook at the user scope"
+                      onClick={() => onEdit('user', `hooks.${event}`)}
+                    >
+                      Edit in Editor
+                    </button>
+                  )}
               </div>
             )}
           </div>
