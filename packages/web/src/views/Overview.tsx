@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Api, BackupEntryDto, HealthDto, SettingsResponse } from '../api.js'
 import { flattenLeaves } from '../utils.js'
 
-export function Dashboard({ api, projectDir }: { api: Api; projectDir: string }) {
+export function Overview({ api }: { api: Api }) {
   const [health, setHealth] = useState<HealthDto | null>(null)
   const [settings, setSettings] = useState<SettingsResponse | null>(null)
   const [backups, setBackups] = useState<BackupEntryDto[] | null>(null)
@@ -10,14 +10,14 @@ export function Dashboard({ api, projectDir }: { api: Api; projectDir: string })
 
   useEffect(() => {
     setError(null)
-    Promise.all([api.health(), api.settings(projectDir || undefined), api.backups()])
+    Promise.all([api.health(), api.settings(), api.backups()])
       .then(([h, s, b]) => {
         setHealth(h)
         setSettings(s)
         setBackups(b.backups)
       })
       .catch((e: Error) => setError(e.message))
-  }, [api, projectDir])
+  }, [api])
 
   if (error) return <div className="alert error">{error}</div>
   if (!health || !settings || !backups) return <p className="dim">Loading…</p>
@@ -28,7 +28,7 @@ export function Dashboard({ api, projectDir }: { api: Api; projectDir: string })
 
   return (
     <>
-      <h2>Dashboard</h2>
+      <h2>Overview</h2>
       <div className="cards">
         <div className="card">
           <div className="label">Claude CLI</div>

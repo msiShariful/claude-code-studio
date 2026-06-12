@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Api } from './api.js'
 import { Backups } from './views/Backups.js'
-import { Dashboard } from './views/Dashboard.js'
+import { Overview } from './views/Overview.js'
 import { Editor, type EditorJump } from './views/Editor.js'
 import { Effective } from './views/Effective.js'
 import { Files } from './views/Files.js'
@@ -80,7 +80,7 @@ export function App({ token }: { token: string | null }) {
         </label>
       </aside>
       <main className="content">
-        {view === 'dashboard' && <Dashboard api={api} projectDir={projectDir} />}
+        {view === 'dashboard' && <Overview api={api} />}
         {view === 'effective' && <Effective api={api} projectDir={projectDir} onEdit={jumpToEditor} />}
         {view === 'editor' && (
           <Editor
