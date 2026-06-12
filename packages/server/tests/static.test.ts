@@ -15,6 +15,21 @@ async function webRootFixture(): Promise<string> {
 }
 
 describe('static web serving', () => {
+  it('still enforces the Host allowlist for static assets', async () => {
+    const app = buildServer({ token: TOKEN, webRoot: await webRootFixture() })
+    const res = await app.inject({ url: '/', headers: { host: 'evil.example.com' } })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('still enforces the Host allowlist for the SPA fallback', async () => {
+    const app = buildServer({ token: TOKEN, webRoot: await webRootFixture() })
+    const res = await app.inject({
+      url: '/some/client/route',
+      headers: { host: 'evil.example.com' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
   it('serves index.html at / when webRoot is provided', async () => {
     const app = buildServer({ token: TOKEN, webRoot: await webRootFixture() })
     const res = await app.inject({ url: '/' })
