@@ -90,6 +90,41 @@ interface ScopeTarget {
   edits: EditDto[]
 }
 
+export type McpScope = 'user' | 'local' | 'project'
+
+export interface McpServerEntryDto {
+  name: string
+  scope: McpScope
+  config: Record<string, unknown>
+}
+
+export interface McpListDto {
+  servers: McpServerEntryDto[]
+  warnings: string[]
+}
+
+export interface PluginDto {
+  id: string
+  version: string
+  scope: string
+  enabled: boolean
+  installPath: string
+  projectPath?: string
+}
+
+export interface MarketplaceDto {
+  name: string
+  source: string
+  repo?: string
+  installLocation: string
+}
+
+export interface PluginsListDto {
+  cliFound: boolean
+  plugins: PluginDto[]
+  marketplaces: MarketplaceDto[]
+}
+
 export class Api {
   constructor(private readonly token: string) {}
 
@@ -133,6 +168,42 @@ export class Api {
     return this.request('/api/backups/restore', {
       method: 'POST',
       body: JSON.stringify({ backupPath }),
+    })
+  }
+
+  mcp(projectDir?: string): Promise<McpListDto> {
+    const q = projectDir ? `?projectDir=${encodeURIComponent(projectDir)}` : ''
+    return this.request(`/api/mcp${q}`)
+  }
+
+  mcpAdd(body: {
+    name: string
+    scope: McpScope
+    config: Record<string, unknown>
+    projectDir?: string
+  }): Promise<{ via: 'cli' | 'file' }> {
+    return this.request('/api/mcp/add', { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  mcpRemove(body: { name: string; scope: McpScope; projectDir?: string }): Promise<{ via: string }> {
+    return this.request('/api/mcp/remove', { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  plugins(): Promise<PluginsListDto> {
+    return this.request('/api/plugins')
+  }
+
+  pluginAction(action: string, plugin: string): Promise<{ ok: boolean; output: string }> {
+    return this.request('/api/plugins/action', {
+      method: 'POST',
+      body: JSON.stringify({ action, plugin }),
+    })
+  }
+
+  marketplaceAction(action: string, value: string): Promise<{ ok: boolean; output: string }> {
+    return this.request('/api/plugins/marketplace', {
+      method: 'POST',
+      body: JSON.stringify({ action, value }),
     })
   }
 }

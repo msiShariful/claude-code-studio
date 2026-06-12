@@ -4,11 +4,15 @@ import { Backups } from './views/Backups.js'
 import { Dashboard } from './views/Dashboard.js'
 import { Editor } from './views/Editor.js'
 import { Effective } from './views/Effective.js'
+import { Mcp } from './views/Mcp.js'
+import { Plugins } from './views/Plugins.js'
 
 const VIEWS = [
   ['dashboard', 'Dashboard'],
   ['effective', 'Effective settings'],
   ['editor', 'Editor'],
+  ['mcp', 'MCP servers'],
+  ['plugins', 'Plugins'],
   ['backups', 'Backups'],
 ] as const
 
@@ -67,6 +71,8 @@ export function App({ token }: { token: string | null }) {
         {view === 'dashboard' && <Dashboard api={api} projectDir={projectDir} />}
         {view === 'effective' && <Effective api={api} projectDir={projectDir} />}
         {view === 'editor' && <Editor api={api} projectDir={projectDir} />}
+        {view === 'mcp' && <Mcp api={api} projectDir={projectDir} />}
+        {view === 'plugins' && <Plugins api={api} />}
         {view === 'backups' && <Backups api={api} />}
       </main>
     </div>
