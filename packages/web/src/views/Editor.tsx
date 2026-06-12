@@ -36,6 +36,8 @@ export function Editor({
 }) {
   const projectDir = workspaceProjectDir(workspace)
   const tabs = scopeTabs(workspace)
+  // Invariant: scope ∈ tabs. The shell remounts this component (key per
+  // workspace) on every workspace switch, so scope never outlives its tabs.
   const [scope, setScope] = useState<EditorScope>(tabs[0])
   const [data, setData] = useState<SettingsResponse | null>(null)
   const [rows, setRows] = useState<EditRow[]>([EMPTY_ROW])
