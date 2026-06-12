@@ -28,6 +28,12 @@ function listRunner(): CliRunner {
 }
 
 describe('/api/plugins', () => {
+  it('requires auth', async () => {
+    const { app } = await fixture({ runner: missingRunner })
+    const res = await app.inject({ url: '/api/plugins' })
+    expect(res.statusCode).toBe(401)
+  })
+
   it('lists plugins and marketplaces when the CLI is present', async () => {
     const { app } = await fixture({ runner: listRunner() })
     const res = await app.inject({ url: '/api/plugins', headers: auth })
