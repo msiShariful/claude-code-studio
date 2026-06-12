@@ -5,6 +5,7 @@ import { Dashboard } from './views/Dashboard.js'
 import { Editor, type EditorJump } from './views/Editor.js'
 import { Effective } from './views/Effective.js'
 import { Files } from './views/Files.js'
+import { Hooks } from './views/Hooks.js'
 import { Mcp } from './views/Mcp.js'
 import { Plugins } from './views/Plugins.js'
 
@@ -13,6 +14,7 @@ const VIEWS = [
   ['effective', 'Effective settings'],
   ['editor', 'Editor'],
   ['files', 'Agents & files'],
+  ['hooks', 'Hooks'],
   ['mcp', 'MCP servers'],
   ['plugins', 'Plugins'],
   ['backups', 'Backups'],
@@ -87,6 +89,7 @@ export function App({ token }: { token: string | null }) {
           />
         )}
         {view === 'files' && <Files api={api} projectDir={projectDir} />}
+        {view === 'hooks' && <Hooks api={api} projectDir={projectDir} onEdit={jumpToEditor} />}
         {view === 'mcp' && <Mcp api={api} projectDir={projectDir} />}
         {view === 'plugins' && <Plugins api={api} />}
         {view === 'backups' && <Backups api={api} />}
