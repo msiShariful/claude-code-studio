@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError, type Api, type PendingChangeDto, type SettingsResponse } from '../api.js'
 import { diffLineKind, parseEditValue } from '../utils.js'
+import { workspaceProjectDir, type Workspace } from '../workspace.js'
 
-const EDITABLE = ['user', 'project', 'projectLocal'] as const
-export type EditableScope = (typeof EDITABLE)[number]
+export type EditableScope = 'user' | 'project' | 'projectLocal'
+export type EditorScope = EditableScope | 'managed'
 
 export interface EditorJump {
   scope: EditableScope
@@ -18,18 +19,24 @@ interface EditRow {
 
 const EMPTY_ROW: EditRow = { path: '', value: '', remove: false }
 
+function scopeTabs(workspace: Workspace): readonly EditorScope[] {
+  return workspace.kind === 'global' ? ['user', 'managed'] : ['project', 'projectLocal']
+}
+
 export function Editor({
   api,
-  projectDir,
+  workspace,
   jump,
   onJumpConsumed,
 }: {
   api: Api
-  projectDir: string
+  workspace: Workspace
   jump?: EditorJump | null
   onJumpConsumed?: () => void
 }) {
-  const [scope, setScope] = useState<EditableScope>('user')
+  const projectDir = workspaceProjectDir(workspace)
+  const tabs = scopeTabs(workspace)
+  const [scope, setScope] = useState<EditorScope>(tabs[0])
   const [data, setData] = useState<SettingsResponse | null>(null)
   const [rows, setRows] = useState<EditRow[]>([EMPTY_ROW])
   const [pending, setPending] = useState<PendingChangeDto | null>(null)
@@ -37,12 +44,14 @@ export function Editor({
 
   useEffect(() => {
     if (!jump) return
-    setScope(jump.scope)
-    setRows([{ path: jump.path, value: '', remove: false }])
-    setPending(null)
-    setMessage(null)
+    if (scopeTabs(workspace).includes(jump.scope)) {
+      setScope(jump.scope)
+      setRows([{ path: jump.path, value: '', remove: false }])
+      setPending(null)
+      setMessage(null)
+    }
     onJumpConsumed?.()
-  }, [jump, onJumpConsumed])
+  }, [jump, onJumpConsumed, workspace])
 
   const reload = useCallback(async () => {
     setData(null)
@@ -59,8 +68,8 @@ export function Editor({
     setMessage(null)
   }, [reload])
 
-  const needsProjectDir = scope !== 'user' && !projectDir
   const entry = data?.entries.find((e) => e.scope === scope)
+  const readonly = scope === 'managed'
 
   function buildEdits() {
     return rows
@@ -77,7 +86,7 @@ export function Editor({
     setPending(null)
     try {
       const change = await api.preview({
-        scope,
+        scope: scope as EditableScope,
         projectDir: scope === 'user' ? undefined : projectDir,
         edits: buildEdits(),
       })
@@ -92,7 +101,7 @@ export function Editor({
     setMessage(null)
     try {
       await api.apply({
-        scope,
+        scope: scope as EditableScope,
         projectDir: scope === 'user' ? undefined : projectDir,
         edits: buildEdits(),
         expectedHash: pending.expectedHash,
@@ -122,9 +131,9 @@ export function Editor({
 
   return (
     <>
-      <h2>Editor</h2>
+      <h2>Settings</h2>
       <div className="scope-picker">
-        {EDITABLE.map((s) => (
+        {tabs.map((s) => (
           <button
             key={s}
             className={scope === s ? `active ${s}` : ''}
@@ -140,87 +149,86 @@ export function Editor({
         ))}
       </div>
 
-      {needsProjectDir ? (
-        <div className="alert">
-          Set a project directory in the sidebar to edit project-scope settings.
+      <p className="dim">{entry ? entry.state.path : ''}</p>
+      {readonly ? (
+        <>
+          <div className="alert">
+            Managed settings are machine-level policy and read-only — Studio never writes them.
+          </div>
+          <pre className="code">{entry?.state.raw ?? '(file does not exist)'}</pre>
+        </>
+      ) : entry?.state.parseError ? (
+        <div className="alert error">
+          This file is not valid JSON ({entry.state.parseError}). Fix it in your editor of choice —
+          Studio refuses to write through a parse failure.
         </div>
       ) : (
         <>
-          <p className="dim">{entry ? entry.state.path : ''}</p>
-          {entry?.state.parseError ? (
-            <div className="alert error">
-              This file is not valid JSON ({entry.state.parseError}). Fix it in your editor of
-              choice — Studio refuses to write through a parse failure.
-            </div>
-          ) : (
-            <>
-              <pre className="code">{entry?.state.raw ?? '(file does not exist yet)'}</pre>
+          <pre className="code">{entry?.state.raw ?? '(file does not exist yet)'}</pre>
 
-              <h2>Changes</h2>
-              {rows.map((row, i) => (
-                <div className="edit-row" key={i}>
-                  <input
-                    placeholder="model or env.FOO"
-                    value={row.path}
-                    onChange={(e) => updateRow(i, { path: e.target.value })}
-                  />
-                  <input
-                    placeholder='"sonnet" or {"a": 1} or plain text'
-                    value={row.value}
-                    disabled={row.remove}
-                    onChange={(e) => updateRow(i, { value: e.target.value })}
-                  />
-                  <label className="dim">
-                    <input
-                      type="checkbox"
-                      checked={row.remove}
-                      onChange={(e) => updateRow(i, { remove: e.target.checked })}
-                    />{' '}
-                    remove
-                  </label>
-                  <button
-                    className="ghost"
-                    onClick={() => {
-                      setRows((rs) => rs.filter((_, j) => j !== i))
-                      setPending(null)
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+          <h2>Changes</h2>
+          {rows.map((row, i) => (
+            <div className="edit-row" key={i}>
+              <input
+                placeholder="model or env.FOO"
+                value={row.path}
+                onChange={(e) => updateRow(i, { path: e.target.value })}
+              />
+              <input
+                placeholder='"sonnet" or {"a": 1} or plain text'
+                value={row.value}
+                disabled={row.remove}
+                onChange={(e) => updateRow(i, { value: e.target.value })}
+              />
+              <label className="dim">
+                <input
+                  type="checkbox"
+                  checked={row.remove}
+                  onChange={(e) => updateRow(i, { remove: e.target.checked })}
+                />{' '}
+                remove
+              </label>
+              <button
+                className="ghost"
+                onClick={() => {
+                  setRows((rs) => rs.filter((_, j) => j !== i))
+                  setPending(null)
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <div className="toolbar">
+            <button className="ghost" onClick={() => setRows((rs) => [...rs, EMPTY_ROW])}>
+              + Add change
+            </button>
+            <button
+              className="action"
+              disabled={buildEdits().length === 0}
+              onClick={() => void preview()}
+            >
+              Preview diff
+            </button>
+          </div>
+
+          {pending && (
+            <>
+              <pre className="diff">
+                {pending.diff.split('\n').map((line, i) => (
+                  <div key={i} className={diffLineKind(line)}>
+                    {line}
+                  </div>
+                ))}
+              </pre>
               <div className="toolbar">
-                <button className="ghost" onClick={() => setRows((rs) => [...rs, EMPTY_ROW])}>
-                  + Add change
+                <button className="action" onClick={() => void apply()}>
+                  Apply change
                 </button>
-                <button
-                  className="action"
-                  disabled={buildEdits().length === 0}
-                  onClick={() => void preview()}
-                >
-                  Preview diff
+                <button className="ghost" onClick={() => setPending(null)}>
+                  Discard
                 </button>
               </div>
-
-              {pending && (
-                <>
-                  <pre className="diff">
-                    {pending.diff.split('\n').map((line, i) => (
-                      <div key={i} className={diffLineKind(line)}>
-                        {line}
-                      </div>
-                    ))}
-                  </pre>
-                  <div className="toolbar">
-                    <button className="action" onClick={() => void apply()}>
-                      Apply change
-                    </button>
-                    <button className="ghost" onClick={() => setPending(null)}>
-                      Discard
-                    </button>
-                  </div>
-                </>
-              )}
             </>
           )}
         </>

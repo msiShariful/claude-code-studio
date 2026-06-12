@@ -85,7 +85,7 @@ export function App({ token }: { token: string | null }) {
         {view === 'editor' && (
           <Editor
             api={api}
-            projectDir={projectDir}
+            workspace={projectDir ? { kind: 'project', dir: projectDir } : { kind: 'global' }}
             jump={editorJump}
             onJumpConsumed={onJumpConsumed}
           />
