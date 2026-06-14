@@ -43,6 +43,35 @@ describe('Mcp view', () => {
     expect(screen.queryByText('user (all projects)')).toBeNull()
   })
 
+  it('auto-fills the form when a catalog entry is picked', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(LIST), { status: 200 })),
+    )
+    render(<Mcp api={new Api('t')} workspace={{ kind: 'global' }} />)
+    await screen.findByText('figma')
+
+    fireEvent.click(screen.getByText('+ Add server'))
+    fireEvent.change(
+      screen.getByPlaceholderText('Search catalog (e.g. playwright, github, filesystem)…'),
+      { target: { value: 'github' } },
+    )
+    // Only the GitHub entry matches, so there is a single Use button.
+    fireEvent.click(screen.getByText('Use'))
+
+    expect((screen.getByPlaceholderText('server-name') as HTMLInputElement).value).toBe('github')
+    expect((screen.getByPlaceholderText('command (e.g. npx)') as HTMLInputElement).value).toBe('npx')
+    expect((screen.getByPlaceholderText('args (space separated)') as HTMLInputElement).value).toContain(
+      '@modelcontextprotocol/server-github',
+    )
+    const extra = screen.getByPlaceholderText(
+      'extra config JSON, e.g. {"env": {"KEY": "value"}} (optional)',
+    ) as HTMLInputElement
+    expect(extra.value).toContain('GITHUB_PERSONAL_ACCESS_TOKEN')
+    // The token hint is surfaced so the user knows to edit before adding.
+    expect(screen.getByText(/Set GITHUB_PERSONAL_ACCESS_TOKEN/)).toBeDefined()
+  })
+
   it('does not let extra config smuggle args past a blank args field', async () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url === '/api/mcp/add') {

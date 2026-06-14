@@ -545,3 +545,80 @@ pre.json-view {
 textarea {
   line-height: 1.6;
 }
+
+/* ---- MCP catalog picker ---- */
+
+.catalog-search {
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.catalog {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  max-height: 16rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.catalog-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.catalog-item:last-child {
+  border-bottom: none;
+}
+
+.catalog-item:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.catalog-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.catalog-title {
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.catalog-cmd {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.catalog-desc {
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+}
+
+.catalog-item .ghost {
+  flex: 0 0 auto;
+}
+
+.catalog-empty {
+  margin: 0 0 0.75rem;
+}
+
+.catalog-sep {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.66rem;
+  color: var(--ink-dim);
+  text-align: center;
+  margin: 0.25rem 0 1rem;
+}

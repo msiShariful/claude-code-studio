@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Api, McpListDto, McpScope } from '../api.js'
+import { filterCatalog, type McpCatalogEntry } from '../mcpCatalog.js'
 import { parseEditValue } from '../utils.js'
 import { workspaceProjectDir, type Workspace } from '../workspace.js'
 
@@ -16,6 +17,7 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
   const projectDir = workspaceProjectDir(workspace)
   const [data, setData] = useState<McpListDto | null>(null)
   const [adding, setAdding] = useState(false)
+  const [search, setSearch] = useState('')
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({
     name: '',
@@ -57,6 +59,24 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
       base.url = form.url
     }
     return base
+  }
+
+  function useCatalogEntry(entry: McpCatalogEntry) {
+    setForm((prev) => ({
+      ...prev,
+      name: entry.id,
+      transport: 'stdio',
+      command: entry.command,
+      args: entry.args.join(' '),
+      url: '',
+      extra: entry.env ? JSON.stringify({ env: entry.env }) : '',
+    }))
+    setMessage({
+      kind: 'ok',
+      text: entry.needs
+        ? `Loaded “${entry.title}”. ${entry.needs}`
+        : `Loaded “${entry.title}”. Review the fields below, then Add server.`,
+    })
   }
 
   async function add() {
@@ -116,6 +136,7 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
   const visibleServers = data.servers.filter((s) =>
     workspace.kind === 'global' ? s.scope === 'user' : s.scope !== 'user',
   )
+  const catalogMatches = filterCatalog(search)
 
   return (
     <>
@@ -174,6 +195,34 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
 
       {adding && (
         <div className="card">
+          <input
+            className="catalog-search"
+            placeholder="Search catalog (e.g. playwright, github, filesystem)…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {catalogMatches.length === 0 ? (
+            <p className="dim catalog-empty">No catalog matches — configure manually below.</p>
+          ) : (
+            <ul className="catalog">
+              {catalogMatches.map((entry) => (
+                <li className="catalog-item" key={entry.id}>
+                  <div className="catalog-info">
+                    <span className="catalog-title">{entry.title}</span>
+                    <span className="catalog-cmd">
+                      {entry.command} {entry.args.join(' ')}
+                    </span>
+                    <span className="catalog-desc">{entry.description}</span>
+                  </div>
+                  <button type="button" className="ghost" onClick={() => useCatalogEntry(entry)}>
+                    Use
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="catalog-sep">or configure manually</div>
+
           <div className="edit-row" style={{ gridTemplateColumns: workspace.kind === 'project' ? '1fr 1fr 1fr' : '1fr 1fr' }}>
             <input
               placeholder="server-name"
