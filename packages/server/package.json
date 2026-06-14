@@ -1,6 +1,6 @@
 {
   "name": "cc-studio",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "Claude Code Studio — a local GUI for managing Claude Code settings: config files, MCP servers, plugins, hooks, agents, skills, and CLAUDE.md.",
   "keywords": [
     "claude",
@@ -20,12 +20,16 @@
   "bugs": "https://github.com/msiShariful/claude-code-studio/issues",
   "type": "module",
   "main": "./dist/index.js",
-  "bin": { "cc-studio": "./dist/bin.js" },
+  "bin": {
+    "cc-studio": "./dist/bin.js"
+  },
   "files": [
     "dist",
     "web-dist"
   ],
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit && node scripts/bundle.mjs",
     "prepack": "node scripts/prepack.mjs"
