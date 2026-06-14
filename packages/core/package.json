@@ -15,6 +15,5 @@
     }
   },
   "scripts": { "build": "tsc -p tsconfig.json" },
-  "dependencies": { "diff": "^7.0.0" },
-  "devDependencies": { "@types/diff": "^7.0.0" }
+  "dependencies": { "diff": "^9.0.0" }
 }
