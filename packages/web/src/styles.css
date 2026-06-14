@@ -421,6 +421,68 @@ pre.diff .add { color: var(--diff-add); }
 pre.diff .del { color: var(--diff-del); }
 pre.diff .meta { color: var(--ink-dim); }
 
+/* ---- foldable JSON viewer ---- */
+
+pre.json-view {
+  padding: 0.85rem 0;
+}
+
+.json-line {
+  display: flex;
+  align-items: baseline;
+  padding: 0 1rem;
+}
+
+.json-line:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ln-gutter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+  user-select: none;
+  margin-right: 0.9rem;
+}
+
+.fold,
+.fold-spacer {
+  width: 1.1ch;
+  height: 1.1em;
+  flex: 0 0 auto;
+}
+
+.fold {
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+
+.fold:hover {
+  color: var(--accent);
+}
+
+.ln-num {
+  display: inline-block;
+  text-align: right;
+  color: var(--ink-dim);
+  opacity: 0.6;
+}
+
+.ln-text {
+  white-space: pre;
+}
+
+.fold-ellipsis {
+  color: var(--ink-dim);
+}
+
 /* ---- alerts ---- */
 
 .alert {

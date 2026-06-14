@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError, type Api, type PendingChangeDto, type SettingsResponse } from '../api.js'
+import { JsonView } from '../components/JsonView.js'
 import { diffLineKind, parseEditValue } from '../utils.js'
 import { workspaceProjectDir, type Workspace } from '../workspace.js'
 
@@ -157,7 +158,11 @@ export function Editor({
           <div className="alert">
             Managed settings are machine-level policy and read-only — Studio never writes them.
           </div>
-          <pre className="code">{entry?.state.raw ?? '(file does not exist)'}</pre>
+          {entry?.state.raw ? (
+            <JsonView raw={entry.state.raw} />
+          ) : (
+            <pre className="code">(file does not exist)</pre>
+          )}
         </>
       ) : entry?.state.parseError ? (
         <div className="alert error">
@@ -166,7 +171,11 @@ export function Editor({
         </div>
       ) : (
         <>
-          <pre className="code">{entry?.state.raw ?? '(file does not exist yet)'}</pre>
+          {entry?.state.raw ? (
+            <JsonView raw={entry.state.raw} />
+          ) : (
+            <pre className="code">(file does not exist yet)</pre>
+          )}
 
           <h2>Changes</h2>
           {rows.map((row, i) => (
