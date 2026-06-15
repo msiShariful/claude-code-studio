@@ -46,6 +46,29 @@ describe('/api/mcp', () => {
     expect(JSON.parse(await readFile(globalPaths.claudeJson, 'utf8')).mcpServers).toEqual({})
   })
 
+  it('reports per-server health from `claude mcp list`', async () => {
+    const cliRunner: CliRunner = vi.fn().mockResolvedValue({
+      command: 'claude mcp list',
+      exitCode: 0,
+      stdout: 'context7: npx x - ✓ Connected\nfilesystem: npx y - ✗ Failed to connect\n',
+      stderr: '',
+    })
+    const { app } = await fixture({ runner: cliRunner })
+    const res = await app.inject({ url: '/api/mcp/health', headers: auth })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({
+      available: true,
+      status: { context7: 'connected', filesystem: 'failed' },
+    })
+  })
+
+  it('health reports available:false when the CLI is missing', async () => {
+    const { app } = await fixture({ runner: missingRunner })
+    const res = await app.inject({ url: '/api/mcp/health', headers: auth })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ available: false, status: {} })
+  })
+
   it('surfaces non-zero CLI exits as 400 with the command output', async () => {
     const cliRunner: CliRunner = vi
       .fn()

@@ -1,6 +1,7 @@
 import {
   addMcpServer,
   MCP_SCOPES,
+  readMcpHealth,
   readMcpServers,
   removeMcpServer,
   type McpScope,
@@ -41,6 +42,14 @@ export function mcpRoutes(app: FastifyInstance, ctx: ServerContext): void {
       return reply.code(400).send({ error: 'projectDir must be an absolute path' })
     }
     return readMcpServers(ctx.globalPaths, projectDir)
+  })
+
+  app.get<{ Querystring: { projectDir?: string } }>('/api/mcp/health', async (req, reply) => {
+    const { projectDir } = req.query
+    if (projectDir && !isAbsolute(projectDir)) {
+      return reply.code(400).send({ error: 'projectDir must be an absolute path' })
+    }
+    return readMcpHealth(ctx.runner, projectDir)
   })
 
   app.post('/api/mcp/add', async (req, reply) => {

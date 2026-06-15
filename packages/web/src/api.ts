@@ -109,6 +109,13 @@ export interface McpListDto {
   warnings: string[]
 }
 
+export type McpHealthStatus = 'connected' | 'failed' | 'unknown'
+
+export interface McpHealthDto {
+  available: boolean
+  status: Record<string, McpHealthStatus>
+}
+
 export interface PluginDto {
   id: string
   version: string
@@ -212,6 +219,11 @@ export class Api {
   mcp(projectDir?: string): Promise<McpListDto> {
     const q = projectDir ? `?projectDir=${encodeURIComponent(projectDir)}` : ''
     return this.request(`/api/mcp${q}`)
+  }
+
+  mcpHealth(projectDir?: string): Promise<McpHealthDto> {
+    const q = projectDir ? `?projectDir=${encodeURIComponent(projectDir)}` : ''
+    return this.request(`/api/mcp/health${q}`)
   }
 
   mcpAdd(body: {

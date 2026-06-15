@@ -43,6 +43,22 @@ describe('Mcp view', () => {
     expect(screen.queryByText('user (all projects)')).toBeNull()
   })
 
+  it('shows live connection status from the health probe', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.startsWith('/api/mcp/health')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ available: true, status: { figma: 'failed' } }), {
+            status: 200,
+          }),
+        )
+      }
+      return Promise.resolve(new Response(JSON.stringify(LIST), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<Mcp api={new Api('t')} workspace={{ kind: 'global' }} />)
+    expect(await screen.findByText('✗ failed')).toBeDefined()
+  })
+
   it('auto-fills the form when a catalog entry is picked', async () => {
     vi.stubGlobal(
       'fetch',

@@ -321,6 +321,8 @@ button.ghost:disabled {
 .badge.project { color: var(--scope-project); }
 .badge.projectLocal { color: var(--scope-projectLocal); }
 .badge.managed { color: var(--scope-managed); }
+.badge.connected { color: var(--scope-project); text-transform: none; letter-spacing: 0; }
+.badge.failed { color: var(--scope-managed); text-transform: none; letter-spacing: 0; }
 
 /* ---- tables ---- */
 

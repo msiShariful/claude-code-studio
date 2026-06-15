@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Api, McpListDto, McpScope } from '../api.js'
+import type { Api, McpHealthDto, McpListDto, McpScope } from '../api.js'
 import { filterCatalog, type McpCatalogEntry } from '../mcpCatalog.js'
 import { parseEditValue } from '../utils.js'
 import { workspaceProjectDir, type Workspace } from '../workspace.js'
@@ -16,6 +16,8 @@ function describeTarget(config: Record<string, unknown>): string {
 export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
   const projectDir = workspaceProjectDir(workspace)
   const [data, setData] = useState<McpListDto | null>(null)
+  const [health, setHealth] = useState<McpHealthDto | null>(null)
+  const [checking, setChecking] = useState(false)
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
   const [busy, setBusy] = useState(false)
@@ -39,9 +41,23 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
     }
   }, [api, projectDir])
 
+  const reloadHealth = useCallback(async () => {
+    setChecking(true)
+    setHealth(null)
+    try {
+      setHealth(await api.mcpHealth(projectDir || undefined))
+    } catch {
+      // The list still renders; health is best-effort and never blocks the view.
+      setHealth({ available: false, status: {} })
+    } finally {
+      setChecking(false)
+    }
+  }, [api, projectDir])
+
   useEffect(() => {
     void reload()
-  }, [reload])
+    void reloadHealth()
+  }, [reload, reloadHealth])
 
   function buildConfig(): Record<string, unknown> {
     const extra = form.extra.trim() ? parseEditValue(form.extra) : {}
@@ -106,6 +122,7 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
       setAdding(false)
       setForm((prev) => ({ ...prev, name: '', command: '', args: '', url: '', extra: '' }))
       await reload()
+      void reloadHealth()
     } catch (e) {
       setMessage({ kind: 'error', text: (e as Error).message })
     } finally {
@@ -124,6 +141,7 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
         projectDir: scope === 'user' ? undefined : projectDir || undefined,
       })
       await reload()
+      void reloadHealth()
     } catch (e) {
       setMessage({ kind: 'error', text: (e as Error).message })
     } finally {
@@ -137,6 +155,15 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
     workspace.kind === 'global' ? s.scope === 'user' : s.scope !== 'user',
   )
   const catalogMatches = filterCatalog(search)
+
+  function statusCell(name: string) {
+    if (checking || !health) return <span className="dim">checking…</span>
+    if (!health.available) return <span className="dim" title="Run the claude CLI to probe health">—</span>
+    const st = health.status[name] ?? 'unknown'
+    if (st === 'connected') return <span className="badge connected">✓ connected</span>
+    if (st === 'failed') return <span className="badge failed">✗ failed</span>
+    return <span className="dim">unknown</span>
+  }
 
   return (
     <>
@@ -160,6 +187,7 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
             <tr>
               <th>Name</th>
               <th>Scope</th>
+              <th>Status</th>
               <th>Type</th>
               <th>Target</th>
               <th></th>
@@ -174,6 +202,7 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
                     {s.scope}
                   </span>
                 </td>
+                <td>{statusCell(s.name)}</td>
                 <td className="dim">{String(s.config.type ?? 'stdio')}</td>
                 <td className="value">{describeTarget(s.config)}</td>
                 <td>
@@ -187,10 +216,19 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
         </table>
       )}
 
+      {health && !health.available && visibleServers.length > 0 && (
+        <p className="dim">Connection status is unavailable — the claude CLI was not found on the server.</p>
+      )}
+
       <div className="toolbar">
         <button className="ghost" onClick={() => setAdding(!adding)}>
           + Add server
         </button>
+        {visibleServers.length > 0 && (
+          <button className="ghost" disabled={checking} onClick={() => void reloadHealth()}>
+            {checking ? 'Checking…' : 'Re-check status'}
+          </button>
+        )}
       </div>
 
       {adding && (

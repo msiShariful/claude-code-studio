@@ -77,6 +77,52 @@ export async function readMcpServers(
   return { servers, warnings }
 }
 
+export type McpHealthStatus = 'connected' | 'failed' | 'unknown'
+
+export interface McpHealthResult {
+  /** false when the claude CLI is missing or could not be run at all */
+  available: boolean
+  /** connection status keyed by server name (servers absent from the probe are omitted) */
+  status: Record<string, McpHealthStatus>
+}
+
+/**
+ * Parses `claude mcp list` output into per-server connection status. Tolerant of
+ * both the `name: cmd - ✓ Connected` and `name · ✓ connected · N tools` renderings,
+ * and of the leading "Checking MCP server health…" banner.
+ */
+export function parseMcpHealth(output: string): Record<string, McpHealthStatus> {
+  const status: Record<string, McpHealthStatus> = {}
+  for (const line of output.split('\n')) {
+    const m = line.match(/^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*[:·]/)
+    if (!m) continue
+    const rest = line.slice(m[0].length)
+    if (/✓|connected/i.test(rest)) status[m[1]] = 'connected'
+    else if (/✗|✘|failed/i.test(rest)) status[m[1]] = 'failed'
+  }
+  return status
+}
+
+/**
+ * Probes live MCP connection health via `claude mcp list`. The probe actually
+ * connects to each server, so it can be slow; the timeout is generous. Returns
+ * available:false (never throws) when the CLI is absent.
+ */
+export async function readMcpHealth(
+  runner: CliRunner,
+  projectDir?: string,
+): Promise<McpHealthResult> {
+  try {
+    const result = await runner('claude', ['mcp', 'list'], {
+      cwd: projectDir,
+      timeoutMs: 60_000,
+    })
+    return { available: true, status: parseMcpHealth(`${result.stdout}\n${result.stderr}`) }
+  } catch {
+    return { available: false, status: {} }
+  }
+}
+
 /** No leading dash (execFile args starting with - are parsed as flags). */
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
