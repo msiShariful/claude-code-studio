@@ -10,7 +10,17 @@ ships to npm** — `cc-studio` publishes only `dist/` + `web-dist/`.
   attribution (`Co-Authored-By: Claude`, "Generated with Claude", 🤖).
 - **`commands/`** — slash commands: `/release`, `/ship`, `/check`, `/test`, `/review`, `/commit`,
   `/preview`, `/changelog`.
-- **`agents/`** — subagents: `code-reviewer`, `test-runner`.
+- **`agents/`** — subagents: `code-reviewer` (keeps `memory: project`), `test-runner`.
+- **`rules/`** — auto-loaded guidance. `commit-policy.md` loads every session; `testing.md` is
+  `paths`-scoped so it loads only when a test file is open.
+- **`skills/`** — richer, reusable workflows with supporting files. `add-web-section/` documents
+  the exact steps to add a UI section.
+- **`output-styles/`** — `studio-concise.md`, an opt-in terse response style (enable via `/config`
+  or the `outputStyle` setting).
+- **`workflows/`** — `.js` multi-agent orchestration scripts. `review-changes.js` fans out a
+  multi-dimension review of the working diff; run it with `/review-changes`.
+- **`agent-memory/<name>/`** — persistent memory for subagents that declare `memory: project`
+  (shared via git). Auto-managed by the subagent.
 
 Project conventions and architecture live in the root `CLAUDE.md` (and per-package `CLAUDE.md`).
 Personal, machine-specific overrides go in `settings.local.json` / `CLAUDE.local.md`, which are

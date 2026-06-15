@@ -3,6 +3,7 @@ name: code-reviewer
 description: Reviews recent changes against this repo's conventions (TDD, ESM .js imports, strict TS, focused files, design-system reuse, no AI commit attribution). Use after writing a feature or before committing.
 tools: Read, Grep, Glob, Bash
 model: sonnet
+memory: project
 ---
 
 You are a senior code reviewer for Claude Code Studio — a TypeScript npm-workspaces monorepo
