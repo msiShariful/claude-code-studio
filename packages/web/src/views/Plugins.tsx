@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Api, PluginsListDto } from '../api.js'
+import { PageHeader } from '../components/ui.js'
+
+const PLUGINS_INFO =
+  'Install plugins from marketplaces to add bundles of agents, commands, and tools in one step.'
 
 export function Plugins({ api }: { api: Api }) {
   const [data, setData] = useState<PluginsListDto | null>(null)
@@ -42,7 +46,7 @@ export function Plugins({ api }: { api: Api }) {
   if (!data.cliFound) {
     return (
       <>
-        <h2>Plugins</h2>
+        <PageHeader title="Plugins" label="Extensions" info={PLUGINS_INFO} />
         <div className="alert error">
           Plugin management needs the claude CLI on your PATH — Studio drives{' '}
           <code>claude plugin …</code> rather than editing plugin state by hand. Install Claude
@@ -54,7 +58,7 @@ export function Plugins({ api }: { api: Api }) {
 
   return (
     <>
-      <h2>Plugins</h2>
+      <PageHeader title="Plugins" label="Extensions" info={PLUGINS_INFO} />
       {message && <div className={`alert ${message.kind}`}>{message.text}</div>}
 
       {data.plugins.length === 0 ? (

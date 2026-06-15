@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Api, SettingsResponse } from '../api.js'
+import { PageHeader } from '../components/ui.js'
 import { flattenLeaves } from '../utils.js'
 import type { EditableScope } from './Editor.js'
 
@@ -31,10 +32,11 @@ export function Effective({
 
   return (
     <>
-      <h2>Effective settings</h2>
-      <p className="dim">
-        The merged result of every settings file, with the scope each value comes from.
-      </p>
+      <PageHeader
+        title="Effective settings"
+        label="Effective Config"
+        info="The merged result of every settings file, showing which scope each value comes from."
+      />
       {leaves.length === 0 ? (
         <p className="dim">No settings found.</p>
       ) : (

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Api, type ProjectDto } from '../api.js'
+import { Api, type HealthDto, type ProjectDto } from '../api.js'
 import { sectionByKey, sectionsFor } from '../nav.js'
 import {
   decodeProjectId,
@@ -64,6 +64,7 @@ export function Shell({ api }: { api: Api }) {
   const [projects, setProjects] = useState<ProjectDto[] | null>(null)
   const [extras, setExtras] = useState<string[]>(loadExtras)
   const [editorJump, setEditorJump] = useState<EditorJump | null>(null)
+  const [cli, setCli] = useState<HealthDto['cli'] | null>(null)
 
   useEffect(() => {
     api
@@ -71,6 +72,13 @@ export function Shell({ api }: { api: Api }) {
       .then((r) => setProjects(r.projects))
       .catch(() => setProjects([]))
   }, [api, extras])
+
+  useEffect(() => {
+    api
+      .health()
+      .then((h) => setCli(h.cli))
+      .catch(() => setCli({ found: false }))
+  }, [api])
 
   // Land on the last-used workspace (or Global) so the bare URL isn't a dead end.
   useEffect(() => {
@@ -148,10 +156,25 @@ export function Shell({ api }: { api: Api }) {
             onRemoveExtra={removeExtra}
           />
         </div>
-        <div className="breadcrumb">
-          <span className="crumb">{crumbRoot}</span>
-          <span className="crumb-sep">/</span>
-          <span className="crumb current">{crumbTitle}</span>
+        <div className="topbar-right">
+          <div className="breadcrumb">
+            <span className="crumb">{crumbRoot}</span>
+            <span className="crumb-sep">/</span>
+            <span className="crumb current">{crumbTitle}</span>
+          </div>
+          {cli && (
+            <span
+              className="cli-status"
+              title={
+                cli.found
+                  ? `Claude CLI detected${cli.version ? ` (v${cli.version})` : ''}`
+                  : 'Claude CLI not found on PATH — some actions fall back to editing files directly'
+              }
+            >
+              <span className={`cli-dot ${cli.found ? 'ok' : 'bad'}`} aria-hidden="true" />
+              {cli.found ? `CLI ${cli.version ?? 'ready'}` : 'CLI not found'}
+            </span>
+          )}
         </div>
       </header>
 

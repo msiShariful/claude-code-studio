@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Api, McpHealthDto, McpListDto, McpScope } from '../api.js'
+import { PageHeader } from '../components/ui.js'
 import { filterCatalog, type McpCatalogEntry } from '../mcpCatalog.js'
 import { parseEditValue } from '../utils.js'
 import { workspaceProjectDir, type Workspace } from '../workspace.js'
@@ -167,7 +168,11 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
 
   return (
     <>
-      <h2>MCP servers</h2>
+      <PageHeader
+        title="MCP servers"
+        label="Tools & Integrations (MCP servers)"
+        info="Connect Claude to external tools and data — browsers, databases, GitHub and more — through MCP servers."
+      />
       {data.warnings.map((w) => (
         <div className="alert error" key={w}>
           {w}

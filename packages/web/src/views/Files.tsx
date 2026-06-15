@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError, type Api, type FileKind, type FileScope, type FilesListingDto } from '../api.js'
+import { PageHeader } from '../components/ui.js'
 import { workspaceProjectDir, type Workspace } from '../workspace.js'
 
 const GLOBAL_TABS = [
@@ -126,7 +127,11 @@ export function Files({ api, workspace }: { api: Api; workspace: Workspace }) {
 
   return (
     <>
-      <h2>Agents &amp; files</h2>
+      <PageHeader
+        title="Agents & files"
+        label="Agents & Files"
+        info="Custom agents, reusable skills, and the CLAUDE.md memory files that give Claude standing instructions."
+      />
       <div className="scope-picker">
         {tabs.map(([key, label]) => (
           <button

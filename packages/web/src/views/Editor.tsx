@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError, type Api, type PendingChangeDto, type SettingsResponse } from '../api.js'
 import { JsonView } from '../components/JsonView.js'
+import { PageHeader } from '../components/ui.js'
 import { diffLineKind, parseEditValue } from '../utils.js'
 import { workspaceProjectDir, type Workspace } from '../workspace.js'
 
@@ -134,7 +135,11 @@ export function Editor({
 
   return (
     <>
-      <h2>Settings</h2>
+      <PageHeader
+        title="Settings"
+        label="Permissions & Behavior"
+        info="What Claude is allowed to do and how it behaves — model, permission rules, and environment. Saved to settings.json."
+      />
       <div className="scope-picker">
         {tabs.map((s) => (
           <button

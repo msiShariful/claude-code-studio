@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Api, SettingsEntryDto, SettingsResponse, SettingsScope } from '../api.js'
+import { PageHeader } from '../components/ui.js'
 import { workspaceProjectDir, type Workspace } from '../workspace.js'
 import type { EditableScope } from './Editor.js'
 
@@ -52,7 +53,11 @@ export function Hooks({
 
   return (
     <>
-      <h2>Hooks</h2>
+      <PageHeader
+        title="Hooks"
+        label="Automation"
+        info="Run your own shell commands automatically at Claude lifecycle events."
+      />
       <p className="dim">
         Hooks run shell commands at lifecycle events — they live under the <code>hooks</code> key
         of your settings files. Treat them like code you ship to yourself: review every command.

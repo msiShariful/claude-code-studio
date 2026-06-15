@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Api, BackupEntryDto } from '../api.js'
+import { PageHeader } from '../components/ui.js'
 
 export function Backups({ api }: { api: Api }) {
   const [backups, setBackups] = useState<BackupEntryDto[] | null>(null)
@@ -33,10 +34,11 @@ export function Backups({ api }: { api: Api }) {
 
   return (
     <>
-      <h2>Backups</h2>
-      <p className="dim">
-        Studio snapshots every file before changing it. Restore puts the snapshot back.
-      </p>
+      <PageHeader
+        title="Backups"
+        label="History & Backups"
+        info="Studio snapshots every file before it changes it. Restore puts a snapshot back."
+      />
       {message && <div className={`alert ${message.kind}`}>{message.text}</div>}
       {backups.length === 0 ? (
         <p className="dim">No backups yet — they appear after your first applied change.</p>
