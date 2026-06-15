@@ -3,3 +3,7 @@ dist/
 .DS_Store
 *.tsbuildinfo
 web-dist/
+
+# Claude Code — shared config IS committed; personal/local overrides are not
+.claude/settings.local.json
+CLAUDE.local.md

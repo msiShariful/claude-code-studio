@@ -14,6 +14,11 @@
       "default": "./dist/index.js"
     }
   },
-  "scripts": { "build": "tsc -p tsconfig.json" },
-  "dependencies": { "diff": "^9.0.0" }
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "diff": "^9.0.0"
+  }
 }

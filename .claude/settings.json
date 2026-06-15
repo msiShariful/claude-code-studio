@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "Bash(npm test:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run preview:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npm view:*)",
+      "Bash(npm whoami)",
+      "Bash(npm pack:*)",
+      "Bash(npm pkg get:*)",
+      "Bash(npm pkg set:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git add:*)",
+      "Bash(git restore:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git tag:*)",
+      "Bash(git fetch:*)",
+      "Bash(git branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(gh release:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh issue:*)",
+      "Bash(gh repo view:*)"
+    ],
+    "ask": ["Bash(npm publish:*)"],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.key)",
+      "Read(./.npmrc)",
+      "Read(./**/.npmrc)",
+      "Read(~/.npmrc)",
+      "Read(./**/secrets/**)"
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "node \"$CLAUDE_PROJECT_DIR/.claude/statusline.mjs\"",
+    "padding": 0
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-commit.mjs\""
+          }
+        ]
+      }
+    ]
+  }
+}
