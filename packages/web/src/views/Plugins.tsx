@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Api, PluginsListDto } from '../api.js'
 import { PageHeader } from '../components/ui.js'
+import { filterPluginCatalog, type PluginCatalogEntry } from '../pluginCatalog.js'
 
 const PLUGINS_INFO =
   'Install plugins from marketplaces to add bundles of agents, commands, and tools in one step.'
@@ -9,6 +10,7 @@ export function Plugins({ api }: { api: Api }) {
   const [data, setData] = useState<PluginsListDto | null>(null)
   const [installId, setInstallId] = useState('')
   const [marketplaceSrc, setMarketplaceSrc] = useState('')
+  const [search, setSearch] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
@@ -41,7 +43,17 @@ export function Plugins({ api }: { api: Api }) {
     }
   }
 
+  function useMarketplaceEntry(entry: PluginCatalogEntry) {
+    setMarketplaceSrc(entry.source)
+    setMessage({
+      kind: 'ok',
+      text: `Loaded “${entry.title}”. Review the source below, then Add marketplace.`,
+    })
+  }
+
   if (!data) return <p className="dim">Loading…</p>
+
+  const catalogMatches = filterPluginCatalog(search)
 
   if (!data.cliFound) {
     return (
@@ -176,6 +188,32 @@ export function Plugins({ api }: { api: Api }) {
           </tbody>
         </table>
       )}
+
+      <input
+        className="catalog-search"
+        placeholder="Search marketplaces (e.g. superpowers, templates)…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      {catalogMatches.length === 0 ? (
+        <p className="dim catalog-empty">No catalog matches — add any marketplace by source below.</p>
+      ) : (
+        <ul className="catalog">
+          {catalogMatches.map((entry) => (
+            <li className="catalog-item" key={entry.id}>
+              <div className="catalog-info">
+                <span className="catalog-title">{entry.title}</span>
+                <span className="catalog-cmd">{entry.source}</span>
+                <span className="catalog-desc">{entry.description}</span>
+              </div>
+              <button type="button" className="ghost" onClick={() => useMarketplaceEntry(entry)}>
+                Use
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="catalog-sep">or add by source</div>
 
       <div className="toolbar">
         <input

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Api } from '../src/api.js'
 import { Plugins } from '../src/views/Plugins.js'
@@ -33,6 +33,25 @@ describe('Plugins view', () => {
     expect(await screen.findByText('superpowers@claude-plugins-official')).toBeDefined()
     expect(screen.getByText('claude-plugins-official')).toBeDefined()
     expect(screen.getByText('Disable')).toBeDefined()
+  })
+
+  it('searches the marketplace catalog and prefills the add field on Use', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(LIST), { status: 200 })),
+    )
+    render(<Plugins api={new Api('t')} />)
+    await screen.findByText('superpowers@claude-plugins-official')
+    fireEvent.change(
+      screen.getByPlaceholderText('Search marketplaces (e.g. superpowers, templates)…'),
+      { target: { value: 'templates' } },
+    )
+    // only the templates marketplace matches, so there is a single Use button
+    fireEvent.click(screen.getByText('Use'))
+    expect(
+      (screen.getByPlaceholderText('github org/repo, URL, or local path') as HTMLInputElement)
+        .value,
+    ).toBe('davila7/claude-code-templates')
   })
 
   it('shows the degraded notice when the CLI is missing', async () => {

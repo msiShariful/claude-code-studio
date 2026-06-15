@@ -74,7 +74,9 @@ pre {
   border-right: 1px solid var(--line);
   background: var(--bg-inset);
   padding: 1.25rem 0.85rem;
-  overflow-y: auto;
+  /* visible (not auto) so section tooltips can escape the narrow column;
+     the section list is short and never needs its own scrollbar */
+  overflow: visible;
 }
 
 .section-nav {
@@ -909,11 +911,13 @@ textarea {
 
 .infotip-bubble {
   position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
+  /* pop out to the right of the icon so it reads into open space and never
+     overflows the narrow sidebar or the top of the viewport */
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
   width: max-content;
-  max-width: 17rem;
+  max-width: 16rem;
   background: var(--bg-raised);
   border: 1px solid var(--line-strong);
   border-radius: 6px;
@@ -928,7 +932,7 @@ textarea {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s ease;
-  z-index: 20;
+  z-index: 40;
 }
 
 .infotip:hover .infotip-bubble,
