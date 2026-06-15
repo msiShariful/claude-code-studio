@@ -37,6 +37,8 @@ describe('Home dashboard', () => {
     // every standard tile starts in the "set up" state
     expect(screen.getAllByText('Set up →').length).toBeGreaterThan(0)
     expect(screen.getByText('Tools & Integrations')).toBeDefined()
+    // first-run guidance appears when the workspace is empty
+    expect(screen.getByText(/set up here yet/i)).toBeDefined()
   })
 
   it('summarizes configured pieces with status counts', async () => {
@@ -59,6 +61,10 @@ describe('Home dashboard', () => {
     expect(await screen.findByText('1 connected')).toBeDefined()
     expect(screen.getByText('1 event')).toBeDefined()
     expect(screen.getByText('2 set')).toBeDefined()
+    // the configured item names are previewed as chips
+    expect(screen.getByText('figma')).toBeDefined()
+    // no first-run banner once something is configured
+    expect(screen.queryByText(/set up here yet/i)).toBeNull()
   })
 
   it('opens a section when its card is clicked', async () => {
