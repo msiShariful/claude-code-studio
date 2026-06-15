@@ -12,7 +12,8 @@
     "@fontsource/instrument-serif": "^5.0.0",
     "@fontsource/inter": "^5.2.8",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.17.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.0",
