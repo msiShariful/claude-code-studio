@@ -60,11 +60,16 @@ describe('Plugins view', () => {
     expect(within(installed).getAllByText(/2026-05-03 17:07 UTC/).length).toBeGreaterThan(0)
   })
 
-  it('reveals the catalog from the Add marketplace toggle and prefills the source on Use', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(LIST), { status: 200 })),
-    )
+  it('reveals the catalog and adds a marketplace directly from its row', async () => {
+    const actionBodies: string[] = []
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (typeof url === 'string' && url.includes('/api/plugins/marketplace')) {
+        actionBodies.push(String(init?.body))
+        return Promise.resolve(new Response(JSON.stringify({ ok: true, output: '' }), { status: 200 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify(LIST), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
     render(<Plugins api={new Api('t')} workspace={{ kind: 'global' }} />)
     await screen.findByRole('region', { name: 'Installed plugins' })
     // catalog is hidden until the add panel is opened
@@ -74,11 +79,13 @@ describe('Plugins view', () => {
       screen.getByPlaceholderText('Search marketplaces (e.g. superpowers, templates)…'),
       { target: { value: 'templates' } },
     )
-    fireEvent.click(screen.getByText('Use'))
+    // the catalog row's own Add button adds it directly — no Use step
+    const list = screen.getByRole('list')
+    fireEvent.click(within(list).getByRole('button', { name: 'Add' }))
+    await screen.findByText(/Added marketplace/)
     expect(
-      (screen.getByPlaceholderText('github org/repo, URL, or local path') as HTMLInputElement)
-        .value,
-    ).toBe('davila7/claude-code-templates')
+      actionBodies.some((b) => b.includes('davila7/claude-code-templates') && b.includes('add')),
+    ).toBe(true)
   })
 
   it('reveals the install field from the Install plugin toggle', async () => {
@@ -91,6 +98,43 @@ describe('Plugins view', () => {
     expect(screen.queryByPlaceholderText('plugin or plugin@marketplace')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '+ Install plugin' }))
     expect(screen.getByPlaceholderText('plugin or plugin@marketplace')).toBeDefined()
+  })
+
+  const AVAILABLE = {
+    cliFound: true,
+    available: [
+      { installId: 'code-review@official', name: 'code-review', marketplace: 'official', description: 'Automated code review', category: 'development' },
+      { installId: 'superpowers@official', name: 'superpowers', marketplace: 'official', description: 'Workflow skills' },
+    ],
+  }
+
+  it('installs a searched plugin directly from its suggestion row', async () => {
+    const actionBodies: string[] = []
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (typeof url === 'string' && url.includes('/api/plugins/available')) {
+        return Promise.resolve(new Response(JSON.stringify(AVAILABLE), { status: 200 }))
+      }
+      if (typeof url === 'string' && url.includes('/api/plugins/action')) {
+        actionBodies.push(String(init?.body))
+        return Promise.resolve(new Response(JSON.stringify({ ok: true, output: '' }), { status: 200 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify(LIST), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'global' }} />)
+    await screen.findByRole('region', { name: 'Installed plugins' })
+    fireEvent.click(screen.getByRole('button', { name: '+ Install plugin' }))
+
+    const search = await screen.findByPlaceholderText('Search plugins to install…')
+    expect(await screen.findByText('code-review')).toBeDefined()
+    fireEvent.change(search, { target: { value: 'superpowers' } })
+    // the suggestion list now holds only the superpowers row
+    const list = screen.getByRole('list')
+    expect(within(list).queryByText('code-review')).toBeNull()
+    // its own Install button installs it directly — no Use step
+    fireEvent.click(within(list).getByRole('button', { name: 'Install' }))
+    await screen.findByText(/Installed superpowers@official/)
+    expect(actionBodies.some((b) => b.includes('superpowers@official') && b.includes('install'))).toBe(true)
   })
 
   it('shows an in-progress label and a hint while adding a marketplace', async () => {
@@ -187,6 +231,30 @@ describe('Plugins view', () => {
     // no user-scope machinery: marketplaces section and install toggle are gone
     expect(screen.queryByRole('region', { name: 'Marketplaces' })).toBeNull()
     expect(screen.queryByRole('button', { name: '+ Install plugin' })).toBeNull()
+  })
+
+  it('surfaces action results in a dismissible toast instead of a top banner', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (typeof url === 'string' && url.includes('/api/plugins/marketplace')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: 'Marketplace file not found' }), { status: 400 }),
+        )
+      }
+      return Promise.resolve(new Response(JSON.stringify(LIST), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'global' }} />)
+    await screen.findByRole('region', { name: 'Installed plugins' })
+    fireEvent.click(screen.getByRole('button', { name: '+ Add marketplace' }))
+    fireEvent.change(screen.getByPlaceholderText('github org/repo, URL, or local path'), {
+      target: { value: 'davila7/x' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Add marketplace' }))
+    // the result lands in a floating toast (role=status), not the document flow
+    const toast = await screen.findByRole('status')
+    expect(within(toast).getByText(/Marketplace file not found/)).toBeDefined()
+    fireEvent.click(within(toast).getByRole('button', { name: 'Dismiss' }))
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('shows the degraded notice when the CLI is missing', async () => {

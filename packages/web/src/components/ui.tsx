@@ -163,6 +163,28 @@ export function useConfirm(): {
   return { confirm, confirmDialog }
 }
 
+export interface ToastMessage {
+  kind: 'ok' | 'error'
+  text: string
+}
+
+/**
+ * A floating, fixed-position notification for action results. Unlike an inline
+ * banner it never shifts the page, and it stays visible no matter where on the
+ * page the action was triggered. Pair with an auto-dismiss timer in the caller.
+ */
+export function Toast({ message, onClose }: { message: ToastMessage | null; onClose: () => void }) {
+  if (!message) return null
+  return (
+    <div className={`toast ${message.kind}`} role="status" aria-live="polite">
+      <span className="toast-text">{message.text}</span>
+      <button type="button" className="toast-close" aria-label="Dismiss" onClick={onClose}>
+        ×
+      </button>
+    </div>
+  )
+}
+
 export function EmptyState({
   title,
   children,

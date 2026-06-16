@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Api, PluginDto, PluginsListDto } from '../api.js'
-import { EmptyState, PageHeader, StatusPill, useConfirm, type ConfirmOptions } from '../components/ui.js'
-import { filterPluginCatalog, type PluginCatalogEntry } from '../pluginCatalog.js'
+import type { Api, AvailablePluginDto, PluginDto, PluginsListDto } from '../api.js'
+import {
+  EmptyState,
+  PageHeader,
+  StatusPill,
+  Toast,
+  useConfirm,
+  type ConfirmOptions,
+} from '../components/ui.js'
+import { filterPluginCatalog } from '../pluginCatalog.js'
 import { workspaceProjectDir, type Workspace } from '../workspace.js'
 
 const PLUGINS_INFO =
@@ -22,6 +29,21 @@ function formatTimestamp(iso?: string): string {
   return `${iso.slice(0, 16).replace('T', ' ')} UTC`
 }
 
+const MAX_SUGGESTIONS = 40
+
+/** Case-insensitive filter over a plugin's name, marketplace, description, and category. */
+function filterAvailable(list: AvailablePluginDto[], query: string): AvailablePluginDto[] {
+  const q = query.trim().toLowerCase()
+  if (q === '') return list
+  return list.filter((p) =>
+    [p.name, p.marketplace, p.description, p.category, p.author]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .includes(q),
+  )
+}
+
 export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) {
   const projectDir = workspaceProjectDir(workspace)
   const isProject = workspace.kind === 'project'
@@ -30,6 +52,8 @@ export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) 
   const [marketplaceSrc, setMarketplaceSrc] = useState('')
   const [search, setSearch] = useState('')
   const [installing, setInstalling] = useState(false)
+  const [pluginSearch, setPluginSearch] = useState('')
+  const [available, setAvailable] = useState<AvailablePluginDto[] | null>(null)
   const [addingMarketplace, setAddingMarketplace] = useState(false)
   // The key of the operation currently running, or null. Drives both the
   // disabled state (any op blocks the others) and per-button progress labels.
@@ -51,6 +75,28 @@ export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) 
     void reload()
   }, [reload])
 
+  // Action results show in a floating toast; clear it automatically so it never
+  // lingers (errors stick around longer than confirmations).
+  useEffect(() => {
+    if (!message) return
+    const t = setTimeout(() => setMessage(null), message.kind === 'error' ? 8000 : 4000)
+    return () => clearTimeout(t)
+  }, [message])
+
+  // Lazily load the installable-plugin suggestions the first time the install
+  // panel is opened — reading marketplace manifests, so it never blocks the list.
+  useEffect(() => {
+    if (!installing || available !== null) return
+    let live = true
+    api
+      .availablePlugins()
+      .then((r) => live && setAvailable(r.available))
+      .catch(() => live && setAvailable([]))
+    return () => {
+      live = false
+    }
+  }, [installing, available, api])
+
   async function run(fn: () => Promise<unknown>, okText: string, key: string): Promise<boolean> {
     setPending(key)
     setMessage(null)
@@ -67,11 +113,13 @@ export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) 
     }
   }
 
-  function useMarketplaceEntry(entry: PluginCatalogEntry) {
-    setMarketplaceSrc(entry.source)
-    setMessage({
-      kind: 'ok',
-      text: `Loaded “${entry.title}”. Review the source below, then Add marketplace.`,
+  function addMarketplace(source: string, key: string) {
+    void run(() => api.marketplaceAction('add', source), `Added marketplace`, key).then((ok) => {
+      if (ok) {
+        setMarketplaceSrc('')
+        setAddingMarketplace(false)
+        setAvailable(null) // refetch suggestions: a new source means new plugins
+      }
     })
   }
 
@@ -104,7 +152,6 @@ export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) 
   return (
     <>
       <PageHeader title="Plugins" label="Extensions" info={PLUGINS_INFO} />
-      {message && <div className={`alert ${message.kind}`}>{message.text}</div>}
 
       <section className="section-block" aria-label="Installed plugins">
         <div className="section-head">
@@ -128,14 +175,67 @@ export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) 
 
         {!isProject && installing && (
           <div className="card">
-            <p className="dim catalog-empty">
-              Install by id — use <code>plugin@marketplace</code> to pick a source.
-              {data.marketplaces.length > 0 && (
-                <> Added marketplaces: {data.marketplaces.map((m) => m.name).join(', ')}.</>
-              )}
-            </p>
+            <input
+              className="catalog-search"
+              placeholder="Search plugins to install…"
+              value={pluginSearch}
+              onChange={(e) => setPluginSearch(e.target.value)}
+            />
+            {available === null ? (
+              <p className="dim catalog-empty">Loading plugins from your marketplaces…</p>
+            ) : (() => {
+              const matches = filterAvailable(available, pluginSearch)
+              if (available.length === 0) {
+                return (
+                  <p className="dim catalog-empty">
+                    No marketplace plugins found — add a marketplace below, or install by id.
+                  </p>
+                )
+              }
+              if (matches.length === 0) {
+                return <p className="dim catalog-empty">No plugins match “{pluginSearch}”.</p>
+              }
+              return (
+                <>
+                  <ul className="catalog">
+                    {matches.slice(0, MAX_SUGGESTIONS).map((p) => (
+                      <li className="catalog-item" key={p.installId}>
+                        <div className="catalog-info">
+                          <span className="catalog-title">
+                            {p.name} <span className="catalog-meta">· {p.marketplace}</span>
+                            {p.category && <span className="catalog-meta"> · {p.category}</span>}
+                          </span>
+                          {p.description && <span className="catalog-desc">{p.description}</span>}
+                        </div>
+                        <button
+                          type="button"
+                          className="action"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(
+                              () => api.pluginAction('install', p.installId),
+                              `Installed ${p.installId}`,
+                              `install:${p.installId}`,
+                            ).then((ok) => ok && setInstalling(false))
+                          }
+                        >
+                          {pending === `install:${p.installId}` ? 'Installing…' : 'Install'}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {matches.length > MAX_SUGGESTIONS && (
+                    <p className="dim catalog-empty">
+                      Showing {MAX_SUGGESTIONS} of {matches.length} — refine your search.
+                    </p>
+                  )}
+                </>
+              )
+            })()}
+            <div className="catalog-sep">or install by id</div>
             <div className="toolbar" style={{ margin: 0 }}>
               <input
+                style={{ flex: 1 }}
                 placeholder="plugin or plugin@marketplace"
                 value={installId}
                 onChange={(e) => setInstallId(e.target.value)}
@@ -159,7 +259,7 @@ export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) 
                 {pending === 'install' ? 'Installing…' : 'Install'}
               </button>
             </div>
-            {pending === 'install' && (
+            {pending?.startsWith('install') && (
               <p className="dim working-hint">Fetching and installing the plugin — this can take a moment.</p>
             )}
           </div>
@@ -234,8 +334,13 @@ export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) 
                       <span className="catalog-cmd">{entry.source}</span>
                       <span className="catalog-desc">{entry.description}</span>
                     </div>
-                    <button type="button" className="ghost" onClick={() => useMarketplaceEntry(entry)}>
-                      Use
+                    <button
+                      type="button"
+                      className="action"
+                      disabled={busy}
+                      onClick={() => addMarketplace(entry.source, `add-marketplace:${entry.source}`)}
+                    >
+                      {pending === `add-marketplace:${entry.source}` ? 'Adding…' : 'Add'}
                     </button>
                   </li>
                 ))}
@@ -244,6 +349,7 @@ export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) 
             <div className="catalog-sep">or add by source</div>
             <div className="toolbar" style={{ margin: 0 }}>
               <input
+                style={{ flex: 1 }}
                 placeholder="github org/repo, URL, or local path"
                 value={marketplaceSrc}
                 onChange={(e) => setMarketplaceSrc(e.target.value)}
@@ -251,23 +357,12 @@ export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) 
               <button
                 className="action"
                 disabled={busy || !marketplaceSrc.trim()}
-                onClick={() =>
-                  void run(
-                    () => api.marketplaceAction('add', marketplaceSrc.trim()),
-                    `Added marketplace`,
-                    'add-marketplace',
-                  ).then((ok) => {
-                    if (ok) {
-                      setMarketplaceSrc('')
-                      setAddingMarketplace(false)
-                    }
-                  })
-                }
+                onClick={() => addMarketplace(marketplaceSrc.trim(), 'add-marketplace')}
               >
                 {pending === 'add-marketplace' ? 'Adding…' : 'Add marketplace'}
               </button>
             </div>
-            {pending === 'add-marketplace' && (
+            {pending?.startsWith('add-marketplace') && (
               <p className="dim working-hint">Cloning the marketplace repository — this can take a moment.</p>
             )}
           </div>
@@ -307,7 +402,7 @@ export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) 
                               () => api.marketplaceAction('remove', m.name),
                               `Removed ${m.name}`,
                               `remove:${m.name}`,
-                            )
+                            ).then((done) => done && setAvailable(null))
                           }
                         })
                       }}
@@ -323,6 +418,7 @@ export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) 
       </section>
       )}
       {confirmDialog}
+      <Toast message={message} onClose={() => setMessage(null)} />
     </>
   )
 }
