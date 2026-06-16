@@ -122,6 +122,8 @@ export interface PluginDto {
   scope: string
   enabled: boolean
   installPath: string
+  installedAt?: string
+  lastUpdated?: string
   projectPath?: string
 }
 

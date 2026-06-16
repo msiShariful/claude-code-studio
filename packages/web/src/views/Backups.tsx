@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Api, BackupEntryDto } from '../api.js'
-import { PageHeader } from '../components/ui.js'
+import { PageHeader, useConfirm } from '../components/ui.js'
 
 export function Backups({ api }: { api: Api }) {
   const [backups, setBackups] = useState<BackupEntryDto[] | null>(null)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   const reload = useCallback(() => {
     api
@@ -19,7 +20,13 @@ export function Backups({ api }: { api: Api }) {
   useEffect(() => reload(), [reload])
 
   async function restore(entry: BackupEntryDto) {
-    if (!window.confirm(`Restore this backup over ${entry.originalPath}?`)) return
+    const ok = await confirm({
+      title: 'Restore this backup?',
+      body: `This overwrites ${entry.originalPath} with the snapshot — the current file is backed up first.`,
+      confirmLabel: 'Restore',
+      danger: true,
+    })
+    if (!ok) return
     setMessage(null)
     try {
       await api.restore(entry.backupPath)
@@ -66,6 +73,7 @@ export function Backups({ api }: { api: Api }) {
           </tbody>
         </table>
       )}
+      {confirmDialog}
     </>
   )
 }

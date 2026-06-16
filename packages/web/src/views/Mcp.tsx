@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Api, McpHealthDto, McpListDto, McpScope } from '../api.js'
-import { PageHeader } from '../components/ui.js'
+import { PageHeader, useConfirm } from '../components/ui.js'
 import { filterCatalog, type McpCatalogEntry } from '../mcpCatalog.js'
 import { parseEditValue } from '../utils.js'
 import { workspaceProjectDir, type Workspace } from '../workspace.js'
@@ -32,6 +32,7 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
     extra: '',
   })
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   const reload = useCallback(async () => {
     try {
@@ -132,7 +133,13 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
   }
 
   async function remove(name: string, scope: McpScope) {
-    if (!window.confirm(`Remove MCP server "${name}" (${scope} scope)?`)) return
+    const ok = await confirm({
+      title: `Remove MCP server “${name}”?`,
+      body: `Claude will no longer connect to this ${scope}-scope server.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    })
+    if (!ok) return
     setMessage(null)
     setBusy(true)
     try {
@@ -336,6 +343,7 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
           </div>
         </div>
       )}
+      {confirmDialog}
     </>
   )
 }
