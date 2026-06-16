@@ -1,4 +1,5 @@
 import {
+  listAvailablePlugins,
   listMarketplaces,
   listPlugins,
   marketplaceAction,
@@ -35,6 +36,18 @@ export function pluginsRoutes(app: FastifyInstance, ctx: ServerContext): void {
     } catch (err) {
       if (isMissingBinary(err)) {
         return { cliFound: false, plugins: [], marketplaces: [] }
+      }
+      throw err
+    }
+  })
+
+  app.get('/api/plugins/available', async () => {
+    try {
+      const marketplaces = await listMarketplaces(ctx.runner)
+      return { cliFound: true, available: await listAvailablePlugins(marketplaces) }
+    } catch (err) {
+      if (isMissingBinary(err)) {
+        return { cliFound: false, available: [] }
       }
       throw err
     }

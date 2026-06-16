@@ -1,3 +1,6 @@
+import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import type { CliRunner } from '@claude-code-studio/core'
 import { auth, fixture } from './helpers.js'
@@ -52,6 +55,36 @@ describe('/api/plugins', () => {
     expect(body.cliFound).toBe(false)
     expect(body.plugins).toEqual([])
     expect(body.marketplaces).toEqual([])
+  })
+
+  it('lists available plugins read from each marketplace manifest', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ccs-mkt-'))
+    await mkdir(join(dir, '.claude-plugin'), { recursive: true })
+    await writeFile(
+      join(dir, '.claude-plugin', 'marketplace.json'),
+      JSON.stringify({ plugins: [{ name: 'code-review', description: 'Review PRs' }] }),
+    )
+    const runner: CliRunner = vi.fn().mockImplementation((_bin: string, args: string[]) => {
+      const payload = args.includes('marketplace')
+        ? [{ name: 'official', source: 'github', repo: 'a/b', installLocation: dir }]
+        : [PLUGIN]
+      return Promise.resolve({ command: 'c', exitCode: 0, stdout: JSON.stringify(payload), stderr: '' })
+    })
+    const { app } = await fixture({ runner })
+    const res = await app.inject({ url: '/api/plugins/available', headers: auth })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.cliFound).toBe(true)
+    expect(body.available).toEqual([
+      { installId: 'code-review@official', name: 'code-review', marketplace: 'official', description: 'Review PRs' },
+    ])
+  })
+
+  it('available plugins degrade to empty when the CLI is missing', async () => {
+    const { app } = await fixture({ runner: missingRunner })
+    const res = await app.inject({ url: '/api/plugins/available', headers: auth })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ cliFound: false, available: [] })
   })
 
   it('runs allowlisted plugin actions', async () => {

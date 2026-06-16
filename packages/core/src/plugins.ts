@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { CliRunner, CliRunResult } from './cli.js'
 
 export interface PluginInfo {
@@ -16,6 +18,68 @@ export interface MarketplaceInfo {
   source: string
   repo?: string
   installLocation: string
+}
+
+/** A plugin offered by an added marketplace (read from its on-disk manifest). */
+export interface AvailablePlugin {
+  /** what `claude plugin install <id>` takes: `name@marketplace` */
+  installId: string
+  name: string
+  marketplace: string
+  description: string
+  author?: string
+  category?: string
+  homepage?: string
+}
+
+/** Injectable so tests don't touch the filesystem. */
+export type ManifestReader = (path: string) => Promise<string>
+
+const defaultManifestReader: ManifestReader = (path) => readFile(path, 'utf8')
+
+function authorName(author: unknown): string | undefined {
+  if (typeof author === 'string') return author
+  if (author && typeof author === 'object' && typeof (author as { name?: unknown }).name === 'string') {
+    return (author as { name: string }).name
+  }
+  return undefined
+}
+
+/**
+ * Enumerate the plugins each added marketplace offers by reading its cloned
+ * `<installLocation>/.claude-plugin/marketplace.json`. Marketplaces with a
+ * missing or malformed manifest are skipped rather than failing the whole list.
+ */
+export async function listAvailablePlugins(
+  marketplaces: readonly MarketplaceInfo[],
+  reader: ManifestReader = defaultManifestReader,
+): Promise<AvailablePlugin[]> {
+  const out: AvailablePlugin[] = []
+  for (const m of marketplaces) {
+    if (!m.installLocation) continue
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(await reader(join(m.installLocation, '.claude-plugin', 'marketplace.json')))
+    } catch {
+      continue
+    }
+    const plugins = (parsed as { plugins?: unknown })?.plugins
+    if (!Array.isArray(plugins)) continue
+    for (const p of plugins) {
+      if (!p || typeof p !== 'object' || typeof (p as { name?: unknown }).name !== 'string') continue
+      const entry = p as { name: string; description?: unknown; author?: unknown; category?: unknown; homepage?: unknown }
+      out.push({
+        installId: `${entry.name}@${m.name}`,
+        name: entry.name,
+        marketplace: m.name,
+        description: typeof entry.description === 'string' ? entry.description : '',
+        ...(authorName(entry.author) ? { author: authorName(entry.author) } : {}),
+        ...(typeof entry.category === 'string' ? { category: entry.category } : {}),
+        ...(typeof entry.homepage === 'string' ? { homepage: entry.homepage } : {}),
+      })
+    }
+  }
+  return out
 }
 
 export type PluginActionName = 'install' | 'uninstall' | 'enable' | 'disable'

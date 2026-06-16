@@ -140,6 +140,21 @@ export interface PluginsListDto {
   marketplaces: MarketplaceDto[]
 }
 
+export interface AvailablePluginDto {
+  installId: string
+  name: string
+  marketplace: string
+  description: string
+  author?: string
+  category?: string
+  homepage?: string
+}
+
+export interface AvailablePluginsDto {
+  cliFound: boolean
+  available: AvailablePluginDto[]
+}
+
 export type FileKind = 'claudeMd' | 'keybindings' | 'agent' | 'skill'
 export type FileScope = 'user' | 'project'
 
@@ -243,6 +258,10 @@ export class Api {
 
   plugins(): Promise<PluginsListDto> {
     return this.request('/api/plugins')
+  }
+
+  availablePlugins(): Promise<AvailablePluginsDto> {
+    return this.request('/api/plugins/available')
   }
 
   pluginAction(action: string, plugin: string): Promise<{ ok: boolean; output: string }> {

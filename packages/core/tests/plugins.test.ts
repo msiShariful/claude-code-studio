@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { CliRunner } from '../src/cli.js'
 import {
+  listAvailablePlugins,
   listMarketplaces,
   listPlugins,
   marketplaceAction,
@@ -52,6 +53,74 @@ describe('listPlugins / listMarketplaces', () => {
       .fn()
       .mockResolvedValue({ command: 'c', exitCode: 0, stdout: 'warning: not json', stderr: '' })
     await expect(listPlugins(runner)).rejects.toThrow(/JSON/)
+  })
+})
+
+describe('listAvailablePlugins', () => {
+  const MARKETPLACES = [
+    { name: 'official', source: 'github', repo: 'a/b', installLocation: '/m/official' },
+    { name: 'mine', source: 'github', repo: 'me/x', installLocation: '/m/mine' },
+  ]
+
+  function fakeReader(files: Record<string, string>) {
+    return async (path: string) => {
+      const hit = files[path]
+      if (hit === undefined) throw new Error(`ENOENT ${path}`)
+      return hit
+    }
+  }
+
+  it('reads each marketplace manifest and flattens its plugins with name@marketplace ids', async () => {
+    const reader = fakeReader({
+      '/m/official/.claude-plugin/marketplace.json': JSON.stringify({
+        plugins: [
+          {
+            name: 'code-review',
+            description: 'Automated code review',
+            author: { name: 'Anthropic' },
+            category: 'development',
+            homepage: 'https://x',
+          },
+          { name: 'superpowers', description: 'Workflow skills', author: 'Jesse' },
+        ],
+      }),
+      '/m/mine/.claude-plugin/marketplace.json': JSON.stringify({
+        plugins: [{ name: 'token-inspector', description: 'Inspect context' }],
+      }),
+    })
+    const out = await listAvailablePlugins(MARKETPLACES, reader)
+    expect(out).toEqual([
+      {
+        installId: 'code-review@official',
+        name: 'code-review',
+        marketplace: 'official',
+        description: 'Automated code review',
+        author: 'Anthropic',
+        category: 'development',
+        homepage: 'https://x',
+      },
+      {
+        installId: 'superpowers@official',
+        name: 'superpowers',
+        marketplace: 'official',
+        description: 'Workflow skills',
+        author: 'Jesse',
+      },
+      {
+        installId: 'token-inspector@mine',
+        name: 'token-inspector',
+        marketplace: 'mine',
+        description: 'Inspect context',
+      },
+    ])
+  })
+
+  it('skips marketplaces with a missing or invalid manifest', async () => {
+    const reader = fakeReader({
+      '/m/mine/.claude-plugin/marketplace.json': 'not json',
+    })
+    // official manifest is absent (reader throws), mine is invalid JSON → both skipped
+    expect(await listAvailablePlugins(MARKETPLACES, reader)).toEqual([])
   })
 })
 
