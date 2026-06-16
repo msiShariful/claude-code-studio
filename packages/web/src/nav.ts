@@ -3,7 +3,7 @@
 // is a one-line change. Labels are plain-language; `tech` + `info` teach the
 // underlying Claude concept for people who don't know the jargon yet.
 
-export type Scope = 'global' | 'project' | 'both'
+import type { WorkspaceKind } from './workspace.js'
 
 export interface Section {
   /** url segment, e.g. /global/<key> */
@@ -14,9 +14,11 @@ export interface Section {
   tech: string
   /** one-line explanation a newcomer can understand */
   info: string
-  /** which workspaces this section applies to */
-  scope: Scope
+  /** which workspace scopes this section applies to */
+  kinds: readonly WorkspaceKind[]
 }
+
+const ALL: readonly WorkspaceKind[] = ['global', 'user', 'project']
 
 export const SECTIONS: readonly Section[] = [
   {
@@ -24,61 +26,61 @@ export const SECTIONS: readonly Section[] = [
     label: 'Home',
     tech: 'Workspace overview',
     info: 'A dashboard of everything Claude is set up with here, with quick actions to fill the gaps.',
-    scope: 'both',
+    kinds: ALL,
   },
   {
     key: 'settings',
     label: 'Permissions & Behavior',
     tech: 'settings.json',
     info: "Controls what Claude is allowed to do and how it behaves — model, permission rules, environment. Stored in Claude's settings.json files.",
-    scope: 'both',
+    kinds: ALL,
   },
   {
     key: 'tools',
     label: 'Tools & Integrations',
     tech: 'MCP servers',
     info: 'Connect Claude to external tools and data — browsers, databases, GitHub, and more — through MCP servers.',
-    scope: 'both',
+    kinds: ALL,
   },
   {
     key: 'agents',
     label: 'Agents & Files',
     tech: 'agents, skills & CLAUDE.md',
     info: 'Custom agents, reusable skills, and the CLAUDE.md memory files that give Claude standing instructions.',
-    scope: 'both',
+    kinds: ALL,
   },
   {
     key: 'automation',
     label: 'Automation',
     tech: 'hooks',
     info: 'Run your own commands automatically when Claude does something — for example, format code after every edit. These are hooks.',
-    scope: 'both',
+    kinds: ALL,
   },
   {
     key: 'extensions',
     label: 'Extensions',
     tech: 'plugins & marketplaces',
     info: 'Install plugins from marketplaces to add bundles of agents, commands, and tools in one step.',
-    scope: 'global',
+    kinds: ALL,
   },
   {
     key: 'effective',
     label: 'Effective Config',
     tech: 'merged settings',
     info: 'The settings Claude actually uses here after global and project files are merged — and which file each value comes from.',
-    scope: 'project',
+    kinds: ['project'],
   },
   {
     key: 'history',
     label: 'History & Backups',
     tech: 'backups',
     info: 'Every change Studio makes is backed up first. Restore any earlier version of a config file from here.',
-    scope: 'global',
+    kinds: ['global'],
   },
 ]
 
-export function sectionsFor(kind: 'global' | 'project'): Section[] {
-  return SECTIONS.filter((s) => s.scope === 'both' || s.scope === kind)
+export function sectionsFor(kind: WorkspaceKind): Section[] {
+  return SECTIONS.filter((s) => s.kinds.includes(kind))
 }
 
 export function sectionByKey(key: string): Section | undefined {

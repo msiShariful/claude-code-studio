@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Api, PluginDto, PluginsListDto } from '../api.js'
 import { EmptyState, PageHeader, StatusPill, useConfirm, type ConfirmOptions } from '../components/ui.js'
 import { filterPluginCatalog, type PluginCatalogEntry } from '../pluginCatalog.js'
+import { workspaceProjectDir, type Workspace } from '../workspace.js'
 
 const PLUGINS_INFO =
   'Install plugins from marketplaces to add bundles of agents, commands, and tools in one step.'
@@ -21,7 +22,9 @@ function formatTimestamp(iso?: string): string {
   return `${iso.slice(0, 16).replace('T', ' ')} UTC`
 }
 
-export function Plugins({ api }: { api: Api }) {
+export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) {
+  const projectDir = workspaceProjectDir(workspace)
+  const isProject = workspace.kind === 'project'
   const [data, setData] = useState<PluginsListDto | null>(null)
   const [installId, setInstallId] = useState('')
   const [marketplaceSrc, setMarketplaceSrc] = useState('')
@@ -75,6 +78,15 @@ export function Plugins({ api }: { api: Api }) {
   if (!data) return <p className="dim">Loading…</p>
 
   const catalogMatches = filterPluginCatalog(search)
+  // Global lists every plugin; User shows only user-scope; a project shows its
+  // own project/local plugins and never the user-scope ones.
+  const visiblePlugins = data.plugins.filter((p) =>
+    workspace.kind === 'global'
+      ? true
+      : workspace.kind === 'user'
+        ? p.scope === 'user'
+        : p.scope !== 'user' && (!p.projectPath || p.projectPath === projectDir),
+  )
 
   if (!data.cliFound) {
     return (
@@ -98,14 +110,23 @@ export function Plugins({ api }: { api: Api }) {
         <div className="section-head">
           <div className="section-head-title">
             <h3>Installed plugins</h3>
-            <span className="section-meta">{data.plugins.length}</span>
+            <span className="section-meta">{visiblePlugins.length}</span>
           </div>
-          <button className="ghost" onClick={() => setInstalling((v) => !v)}>
-            {installing ? 'Close' : '+ Install plugin'}
-          </button>
+          {!isProject && (
+            <button className="ghost" onClick={() => setInstalling((v) => !v)}>
+              {installing ? 'Close' : '+ Install plugin'}
+            </button>
+          )}
         </div>
 
-        {installing && (
+        {isProject && (
+          <p className="dim section-sub">
+            Plugins active for this project. Install plugins and manage marketplaces from the
+            User or Global scope.
+          </p>
+        )}
+
+        {!isProject && installing && (
           <div className="card">
             <p className="dim catalog-empty">
               Install by id — use <code>plugin@marketplace</code> to pick a source.
@@ -144,9 +165,13 @@ export function Plugins({ api }: { api: Api }) {
           </div>
         )}
 
-        {data.plugins.length === 0 ? (
+        {visiblePlugins.length === 0 ? (
           <EmptyState title="No plugins installed">
-            <p className="dim">Add a marketplace below, then install a plugin from it.</p>
+            <p className="dim">
+              {isProject
+                ? 'No plugins are active for this project yet.'
+                : 'Add a marketplace below, then install a plugin from it.'}
+            </p>
           </EmptyState>
         ) : (
           <table className="kv">
@@ -161,7 +186,7 @@ export function Plugins({ api }: { api: Api }) {
               </tr>
             </thead>
             <tbody>
-              {data.plugins.map((p, i) => (
+              {visiblePlugins.map((p, i) => (
                 <PluginRow
                   key={`${p.id}:${p.scope}:${p.projectPath ?? i}`}
                   api={api}
@@ -177,6 +202,7 @@ export function Plugins({ api }: { api: Api }) {
         )}
       </section>
 
+      {!isProject && (
       <section className="section-block" aria-label="Marketplaces">
         <div className="section-head">
           <div className="section-head-title">
@@ -295,6 +321,7 @@ export function Plugins({ api }: { api: Api }) {
           </table>
         )}
       </section>
+      )}
       {confirmDialog}
     </>
   )

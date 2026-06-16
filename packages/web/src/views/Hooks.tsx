@@ -33,8 +33,8 @@ export function Hooks({
 }) {
   const projectDir = workspaceProjectDir(workspace)
   const scopes: readonly SettingsScope[] =
-    workspace.kind === 'global' ? ['user', 'managed'] : ['project', 'projectLocal']
-  const fallbackScope: EditableScope = workspace.kind === 'global' ? 'user' : 'project'
+    workspace.kind === 'project' ? ['project', 'projectLocal'] : ['user', 'managed']
+  const fallbackScope: EditableScope = workspace.kind === 'project' ? 'project' : 'user'
   const [data, setData] = useState<SettingsResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 

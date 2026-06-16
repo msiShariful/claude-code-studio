@@ -18,12 +18,22 @@ describe('Mcp view', () => {
     vi.unstubAllGlobals()
   })
 
-  it('global workspace shows only user-scope servers', async () => {
+  it('global workspace shows every scope (aggregate)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response(JSON.stringify(LIST), { status: 200 })),
     )
     render(<Mcp api={new Api('t')} workspace={{ kind: 'global' }} />)
+    expect(await screen.findByText('figma')).toBeDefined()
+    expect(screen.getByText('playwright')).toBeDefined()
+  })
+
+  it('user workspace shows only user-scope servers', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(LIST), { status: 200 })),
+    )
+    render(<Mcp api={new Api('t')} workspace={{ kind: 'user' }} />)
     expect(await screen.findByText('figma')).toBeDefined()
     expect(screen.queryByText('playwright')).toBeNull()
   })

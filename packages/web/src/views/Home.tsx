@@ -35,7 +35,8 @@ export function Home({
   onOpen: (sectionKey: string) => void
 }) {
   const projectDir = workspaceProjectDir(workspace) || undefined
-  const isGlobal = workspace.kind === 'global'
+  const kind = workspace.kind
+  const isProject = kind === 'project'
   const [tiles, setTiles] = useState<Tile[]>(LOADING)
 
   useEffect(() => {
@@ -45,17 +46,24 @@ export function Home({
         api.settings(projectDir).catch(() => null),
         api.mcp(projectDir).catch(() => null),
         api.files(projectDir).catch(() => null),
-        isGlobal ? api.plugins().catch(() => null) : Promise.resolve(null),
+        api.plugins().catch(() => null),
       ])
       if (!live) return
+
+      // Same scope rule as each section: Global aggregates everything, User keeps
+      // to user scope, a project keeps to its project/local items.
+      const inScope = <T extends { scope: string; projectPath?: string }>(x: T): boolean =>
+        kind === 'global'
+          ? true
+          : kind === 'user'
+            ? x.scope === 'user'
+            : x.scope !== 'user' && (!x.projectPath || x.projectPath === projectDir)
 
       const effective = settings?.effective?.value ?? {}
       const settingKeys = Object.keys(effective)
       const hookKeys = isObj(effective.hooks) ? Object.keys(effective.hooks) : []
-      const servers = (mcp?.servers ?? [])
-        .filter((s) => (isGlobal ? s.scope === 'user' : s.scope !== 'user'))
-        .map((s) => s.name)
-      const scopeFiles = isGlobal ? files?.user : files?.project
+      const servers = (mcp?.servers ?? []).filter(inScope).map((s) => s.name)
+      const scopeFiles = isProject ? files?.project : files?.user
       const agentNames = [
         ...(scopeFiles?.agents.map((a) => a.name) ?? []),
         ...(scopeFiles?.skills.map((s) => s.name) ?? []),
@@ -95,23 +103,21 @@ export function Home({
           items: hookKeys,
         },
       ]
-      if (isGlobal) {
-        const ids = plugins?.plugins.map((p) => p.id) ?? []
-        next.push({
-          section: 'extensions',
-          status: ids.length ? `${ids.length} installed` : 'None yet',
-          tone: ids.length ? 'ok' : 'muted',
-          blurb: 'Bundles of agents, commands, and tools from marketplaces.',
-          items: ids,
-        })
-      }
+      const ids = (plugins?.plugins ?? []).filter(inScope).map((p) => p.id)
+      next.push({
+        section: 'extensions',
+        status: ids.length ? `${ids.length} installed` : 'None yet',
+        tone: ids.length ? 'ok' : 'muted',
+        blurb: 'Bundles of agents, commands, and tools from marketplaces.',
+        items: ids,
+      })
       setTiles(next)
     }
     void load()
     return () => {
       live = false
     }
-  }, [api, projectDir, isGlobal])
+  }, [api, projectDir, kind, isProject])
 
   const loading = tiles === LOADING
   const nothingConfigured = !loading && tiles.every((t) => t.tone === 'muted')
@@ -119,17 +125,20 @@ export function Home({
   return (
     <>
       <PageHeader
-        title={isGlobal ? 'Global setup' : 'Project setup'}
+        title={kind === 'global' ? 'Global setup' : kind === 'user' ? 'User setup' : 'Project setup'}
         label="This workspace"
         info={
-          isGlobal
-            ? 'Settings here apply to Claude across every project on this machine.'
-            : 'Settings here apply only when Claude runs inside this project, layered on top of your global setup.'
+          kind === 'global'
+            ? 'Everything Claude is set up with on this machine — your user config plus every project.'
+            : kind === 'user'
+              ? 'Your machine-wide config in ~/.claude — it applies to Claude across every project.'
+              : 'Settings here apply only when Claude runs inside this project, layered on top of your user setup.'
         }
       />
       <p className="dim home-intro">
-        Everything Claude is set up with {isGlobal ? 'everywhere' : 'in this project'}. Open any card
-        to add, change, or remove things — no JSON editing required.
+        Everything Claude is set up with{' '}
+        {kind === 'global' ? 'on this machine' : kind === 'user' ? 'for your user' : 'in this project'}
+        . Open any card to add, change, or remove things — no JSON editing required.
       </p>
 
       {loading ? (

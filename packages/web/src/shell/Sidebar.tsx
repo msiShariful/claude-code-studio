@@ -1,5 +1,6 @@
 import { InfoTip } from '../components/ui.js'
 import { sectionsFor } from '../nav.js'
+import type { WorkspaceKind } from '../workspace.js'
 
 /**
  * Section navigation for the active workspace. Plain-language labels with an
@@ -11,7 +12,7 @@ export function Sidebar({
   active,
   onOpen,
 }: {
-  kind: 'global' | 'project'
+  kind: WorkspaceKind
   active: string
   onOpen: (section: string) => void
 }) {

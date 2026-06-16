@@ -29,8 +29,8 @@ interface Open {
 
 export function Files({ api, workspace }: { api: Api; workspace: Workspace }) {
   const projectDir = workspaceProjectDir(workspace)
-  const tabs = workspace.kind === 'global' ? GLOBAL_TABS : PROJECT_TABS
-  const fileScope: FileScope = workspace.kind === 'global' ? 'user' : 'project'
+  const tabs = workspace.kind === 'project' ? PROJECT_TABS : GLOBAL_TABS
+  const fileScope: FileScope = workspace.kind === 'project' ? 'project' : 'user'
   const [listing, setListing] = useState<FilesListingDto | null>(null)
   const [tab, setTab] = useState<Tab>('claudeMd')
   const [open, setOpen] = useState<Open | null>(null)

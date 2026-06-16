@@ -22,7 +22,9 @@ interface EditRow {
 const EMPTY_ROW: EditRow = { path: '', value: '', remove: false }
 
 function scopeTabs(workspace: Workspace): readonly EditorScope[] {
-  return workspace.kind === 'global' ? ['user', 'managed'] : ['project', 'projectLocal']
+  // Project workspaces edit project + local files; Global and User both edit the
+  // machine-level (~/.claude) user + managed scopes.
+  return workspace.kind === 'project' ? ['project', 'projectLocal'] : ['user', 'managed']
 }
 
 export function Editor({

@@ -1,7 +1,21 @@
-export type Workspace = { kind: 'global' } | { kind: 'project'; dir: string }
+export type WorkspaceKind = 'global' | 'user' | 'project'
+
+export type Workspace =
+  | { kind: 'global' }
+  | { kind: 'user' }
+  | { kind: 'project'; dir: string }
 
 export function workspaceProjectDir(ws: Workspace): string {
   return ws.kind === 'project' ? ws.dir : ''
+}
+
+/**
+ * Which settings/file scopes a workspace edits: a project edits project + local
+ * files; Global and User both edit the machine-level (~/.claude) config — User is
+ * the focused view, Global the aggregate that also lists every project's items.
+ */
+export function isProjectWorkspace(ws: Workspace): ws is { kind: 'project'; dir: string } {
+  return ws.kind === 'project'
 }
 
 /** Folder basename, tolerant of both path separators (client-side fallback). */

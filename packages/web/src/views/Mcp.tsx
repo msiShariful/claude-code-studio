@@ -24,7 +24,7 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({
     name: '',
-    scope: (workspace.kind === 'global' ? 'user' : 'local') as McpScope,
+    scope: (workspace.kind === 'project' ? 'local' : 'user') as McpScope,
     transport: 'stdio' as Transport,
     command: '',
     args: '',
@@ -159,8 +159,14 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
 
   if (!data) return <p className="dim">Loading…</p>
 
+  // Global shows every scope (aggregate); User shows only user-scope servers;
+  // a project shows its project + local servers, never the user-scope ones.
   const visibleServers = data.servers.filter((s) =>
-    workspace.kind === 'global' ? s.scope === 'user' : s.scope !== 'user',
+    workspace.kind === 'global'
+      ? true
+      : workspace.kind === 'user'
+        ? s.scope === 'user'
+        : s.scope !== 'user',
   )
   const catalogMatches = filterCatalog(search)
 
@@ -190,8 +196,10 @@ export function Mcp({ api, workspace }: { api: Api; workspace: Workspace }) {
       {visibleServers.length === 0 ? (
         <p className="dim">
           {workspace.kind === 'global'
-            ? 'No user-scope MCP servers configured.'
-            : 'No MCP servers configured for this project.'}
+            ? 'No MCP servers configured.'
+            : workspace.kind === 'user'
+              ? 'No user-scope MCP servers configured.'
+              : 'No MCP servers configured for this project.'}
         </p>
       ) : (
         <table className="kv">

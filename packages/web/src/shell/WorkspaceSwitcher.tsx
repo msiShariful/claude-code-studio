@@ -38,7 +38,11 @@ export function WorkspaceSwitcher({
   const current =
     workspace.kind === 'global'
       ? 'Global'
-      : (projects?.find((p) => p.dir === workspace.dir)?.name ?? projectName(workspace.dir))
+      : workspace.kind === 'user'
+        ? 'User'
+        : (projects?.find((p) => p.dir === workspace.dir)?.name ?? projectName(workspace.dir))
+  const kindLabel =
+    workspace.kind === 'project' ? 'Project' : workspace.kind === 'user' ? 'User' : 'Global'
 
   function pick(ws: Workspace) {
     onSwitch(ws)
@@ -61,7 +65,7 @@ export function WorkspaceSwitcher({
         aria-expanded={open}
         aria-label="Switch workspace"
       >
-        <span className="ws-kind">{workspace.kind === 'global' ? 'Global' : 'Project'}</span>
+        <span className="ws-kind">{kindLabel}</span>
         <span className="ws-current">{current}</span>
         <span className="ws-caret" aria-hidden="true">
           ▾
@@ -74,7 +78,14 @@ export function WorkspaceSwitcher({
             onClick={() => pick({ kind: 'global' })}
           >
             <span className="ws-option-name">Global</span>
-            <span className="ws-option-sub">All projects on this machine</span>
+            <span className="ws-option-sub">Everything, across all projects</span>
+          </button>
+          <button
+            className={workspace.kind === 'user' ? 'ws-option active' : 'ws-option'}
+            onClick={() => pick({ kind: 'user' })}
+          >
+            <span className="ws-option-name">User</span>
+            <span className="ws-option-sub">Your machine-wide ~/.claude config</span>
           </button>
 
           <div className="ws-menu-label">Projects</div>

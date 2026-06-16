@@ -48,13 +48,23 @@ function parseRoute(pathname: string): Parsed {
       return { workspace: { kind, dir }, section: valid ? section : 'home' }
     }
   }
+  if (parts[0] === 'user') {
+    const section = parts[1] ?? 'home'
+    const valid = sectionsFor('user').some((s) => s.key === section)
+    return { workspace: { kind: 'user' }, section: valid ? section : 'home' }
+  }
   const section = parts[0] === 'global' ? (parts[1] ?? 'home') : 'home'
   const valid = sectionsFor('global').some((s) => s.key === section)
   return { workspace: { kind: 'global' }, section: valid ? section : 'home' }
 }
 
 function pathFor(ws: Workspace, section: string): string {
-  const base = ws.kind === 'global' ? '/global' : `/project/${encodeProjectId(ws.dir)}`
+  const base =
+    ws.kind === 'project'
+      ? `/project/${encodeProjectId(ws.dir)}`
+      : ws.kind === 'user'
+        ? '/user'
+        : '/global'
   return section === 'home' ? base : `${base}/${section}`
 }
 
@@ -114,7 +124,7 @@ export function Shell({ api }: { api: Api }) {
   const jumpToEditor = useCallback(
     (scope: EditableScope, path: string) => {
       setEditorJump({ scope, path })
-      navigate(scope === 'user' ? pathFor({ kind: 'global' }, 'settings') : pathFor(workspace, 'settings'))
+      navigate(scope === 'user' ? pathFor({ kind: 'user' }, 'settings') : pathFor(workspace, 'settings'))
     },
     [navigate, workspace],
   )
@@ -139,7 +149,11 @@ export function Shell({ api }: { api: Api }) {
   const activeProject =
     workspace.kind === 'project' ? (projects?.find((p) => p.dir === workspace.dir) ?? null) : null
   const crumbRoot =
-    workspace.kind === 'global' ? 'Global' : (activeProject?.name ?? projectName(workspace.dir))
+    workspace.kind === 'global'
+      ? 'Global'
+      : workspace.kind === 'user'
+        ? 'User'
+        : (activeProject?.name ?? projectName(workspace.dir))
   const crumbTitle = sectionByKey(section)?.label ?? 'Home'
 
   return (
@@ -182,7 +196,7 @@ export function Shell({ api }: { api: Api }) {
         <aside className="sidebar">
           <Sidebar kind={workspace.kind} active={section} onOpen={go} />
         </aside>
-        <main className="content" key={workspace.kind === 'project' ? workspace.dir : 'global'}>
+        <main className="content" key={workspace.kind === 'project' ? workspace.dir : workspace.kind}>
           {workspace.kind === 'project' && activeProject && !activeProject.exists && (
             <div className="alert error">
               This project directory no longer exists on disk: {workspace.dir}
@@ -227,7 +241,7 @@ function renderSection(section: string, workspace: Workspace, api: Api, deps: Vi
     case 'automation':
       return <Hooks api={api} workspace={workspace} onEdit={deps.jumpToEditor} />
     case 'extensions':
-      return <Plugins api={api} />
+      return <Plugins api={api} workspace={workspace} />
     case 'effective':
       return workspace.kind === 'project' ? (
         <Effective api={api} projectDir={workspace.dir} onEdit={deps.jumpToEditor} />

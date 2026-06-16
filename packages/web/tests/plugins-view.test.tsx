@@ -31,7 +31,7 @@ describe('Plugins view', () => {
       'fetch',
       vi.fn().mockResolvedValue(new Response(JSON.stringify(LIST), { status: 200 })),
     )
-    render(<Plugins api={new Api('t')} />)
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'global' }} />)
     const installed = await screen.findByRole('region', { name: 'Installed plugins' })
     // the @marketplace suffix is stripped from the prominent name
     expect(within(installed).getByRole('button', { name: /superpowers/ })).toBeDefined()
@@ -47,7 +47,7 @@ describe('Plugins view', () => {
       'fetch',
       vi.fn().mockResolvedValue(new Response(JSON.stringify(LIST), { status: 200 })),
     )
-    render(<Plugins api={new Api('t')} />)
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'global' }} />)
     const installed = await screen.findByRole('region', { name: 'Installed plugins' })
     // details are hidden until the row is expanded
     expect(within(installed).queryByText('Install path')).toBeNull()
@@ -65,7 +65,7 @@ describe('Plugins view', () => {
       'fetch',
       vi.fn().mockResolvedValue(new Response(JSON.stringify(LIST), { status: 200 })),
     )
-    render(<Plugins api={new Api('t')} />)
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'global' }} />)
     await screen.findByRole('region', { name: 'Installed plugins' })
     // catalog is hidden until the add panel is opened
     expect(screen.queryByPlaceholderText('Search marketplaces (e.g. superpowers, templates)…')).toBeNull()
@@ -86,7 +86,7 @@ describe('Plugins view', () => {
       'fetch',
       vi.fn().mockResolvedValue(new Response(JSON.stringify(LIST), { status: 200 })),
     )
-    render(<Plugins api={new Api('t')} />)
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'global' }} />)
     await screen.findByRole('region', { name: 'Installed plugins' })
     expect(screen.queryByPlaceholderText('plugin or plugin@marketplace')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '+ Install plugin' }))
@@ -104,7 +104,7 @@ describe('Plugins view', () => {
       return Promise.resolve(new Response(JSON.stringify(LIST), { status: 200 }))
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<Plugins api={new Api('t')} />)
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'global' }} />)
     await screen.findByRole('region', { name: 'Installed plugins' })
     fireEvent.click(screen.getByRole('button', { name: '+ Add marketplace' }))
     fireEvent.change(screen.getByPlaceholderText('github org/repo, URL, or local path'), {
@@ -127,7 +127,7 @@ describe('Plugins view', () => {
       return Promise.resolve(new Response(JSON.stringify(LIST), { status: 200 }))
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<Plugins api={new Api('t')} />)
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'global' }} />)
     const installed = await screen.findByRole('region', { name: 'Installed plugins' })
     fireEvent.click(within(installed).getByRole('button', { name: 'Uninstall' }))
     // a modal appears and nothing is uninstalled yet
@@ -146,6 +146,49 @@ describe('Plugins view', () => {
     expect(actionBodies.some((b) => b.includes('uninstall'))).toBe(true)
   })
 
+  const TWO_SCOPES = {
+    cliFound: true,
+    plugins: [
+      { id: 'superpowers@official', version: '5.1.0', scope: 'user', enabled: true, installPath: '/u' },
+      {
+        id: 'token-inspector@shariful',
+        version: '1.0.0',
+        scope: 'local',
+        enabled: false,
+        installPath: '/p',
+        projectPath: '/work/app',
+      },
+    ],
+    marketplaces: [{ name: 'official', source: 'github', repo: 'a/b', installLocation: '/m' }],
+  }
+
+  it('User scope lists only user-scope plugins and keeps the marketplaces section', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(TWO_SCOPES), { status: 200 })),
+    )
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'user' }} />)
+    const installed = await screen.findByRole('region', { name: 'Installed plugins' })
+    expect(within(installed).getByRole('button', { name: /superpowers/ })).toBeDefined()
+    expect(within(installed).queryByRole('button', { name: /token-inspector/ })).toBeNull()
+    // marketplaces are a user/global concern, so they remain visible here
+    expect(screen.getByRole('region', { name: 'Marketplaces' })).toBeDefined()
+  })
+
+  it('Project scope shows only that project’s plugins and hides marketplaces', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(TWO_SCOPES), { status: 200 })),
+    )
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} />)
+    const installed = await screen.findByRole('region', { name: 'Installed plugins' })
+    expect(within(installed).getByRole('button', { name: /token-inspector/ })).toBeDefined()
+    expect(within(installed).queryByRole('button', { name: /superpowers/ })).toBeNull()
+    // no user-scope machinery: marketplaces section and install toggle are gone
+    expect(screen.queryByRole('region', { name: 'Marketplaces' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '+ Install plugin' })).toBeNull()
+  })
+
   it('shows the degraded notice when the CLI is missing', async () => {
     vi.stubGlobal(
       'fetch',
@@ -155,7 +198,7 @@ describe('Plugins view', () => {
         }),
       ),
     )
-    render(<Plugins api={new Api('t')} />)
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'global' }} />)
     expect(await screen.findByText(/claude CLI/)).toBeDefined()
   })
 })

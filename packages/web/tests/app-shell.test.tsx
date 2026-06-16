@@ -153,12 +153,22 @@ describe('App shell', () => {
     expect(await screen.findByText('Global setup')).toBeDefined()
   })
 
-  it('clicking a user-sourced value in Effective jumps to Global settings', async () => {
+  it('clicking a user-sourced value in Effective jumps to User settings', async () => {
     window.history.pushState({}, '', `/project/${APP_ID}/effective`)
     vi.stubGlobal('fetch', stubFetch())
     render(<App token="t" />)
     fireEvent.click(await screen.findByText('model'))
     expect(await screen.findByDisplayValue('model')).toBeDefined()
-    expect(window.location.pathname).toBe('/global/settings')
+    expect(window.location.pathname).toBe('/user/settings')
+  })
+
+  it('switches to the User scope from the workspace switcher', async () => {
+    vi.stubGlobal('fetch', stubFetch())
+    render(<App token="t" />)
+    await screen.findByText('Global setup')
+    fireEvent.click(screen.getByLabelText('Switch workspace'))
+    fireEvent.click(await screen.findByText('User'))
+    expect(await screen.findByText('User setup')).toBeDefined()
+    expect(window.location.pathname).toBe('/user')
   })
 })
