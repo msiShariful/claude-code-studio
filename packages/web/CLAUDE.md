@@ -33,6 +33,13 @@ filters its list/tabs by `workspace.kind` (Global → all, User → user scope, 
 Global and User edit the same machine-level files (settings, agents, hooks); they differ in the
 aggregate list views (MCP, Plugins, Backups), where Global shows everything.
 
+Plugins are the exception to "Project never shows user-scope items": because plugins are installed
+machine-wide and only enabled/disabled per project, the Project Extensions view *does* list the
+inherited user-scope plugins (as active, "From User") and lets each be toggled on/off for that
+project alone — written to `.claude/settings.local.json` via `claude plugin enable/disable --scope
+local` run in the project dir. `GET /api/plugins?projectDir=` returns the project's `enabledPlugins`
+override map for this.
+
 ## Routing
 
 Path-based: `/global/<section>`, `/user/<section>`, and `/project/<base64url(dir)>/<section>`.
