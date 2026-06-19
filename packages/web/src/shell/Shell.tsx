@@ -130,6 +130,13 @@ export function Shell({ api }: { api: Api }) {
   )
   const onJumpConsumed = useCallback(() => setEditorJump(null), [])
 
+  // Plugins are machine-wide; a project can only toggle them. Jump to the User
+  // scope's Extensions page so an install is actually reachable from a project.
+  const installPluginsInUserScope = useCallback(() => {
+    setEditorJump(null)
+    navigate(pathFor({ kind: 'user' }, 'extensions'))
+  }, [navigate])
+
   function saveExtras(next: string[]) {
     setExtras(next)
     window.localStorage.setItem(EXTRAS_KEY, JSON.stringify(next))
@@ -207,6 +214,7 @@ export function Shell({ api }: { api: Api }) {
             onJumpConsumed,
             jumpToEditor,
             go,
+            installPluginsInUserScope,
           })}
         </main>
       </div>
@@ -219,6 +227,7 @@ interface ViewDeps {
   onJumpConsumed: () => void
   jumpToEditor: (scope: EditableScope, path: string) => void
   go: (section: string) => void
+  installPluginsInUserScope: () => void
 }
 
 function renderSection(section: string, workspace: Workspace, api: Api, deps: ViewDeps) {
@@ -241,7 +250,13 @@ function renderSection(section: string, workspace: Workspace, api: Api, deps: Vi
     case 'automation':
       return <Hooks api={api} workspace={workspace} onEdit={deps.jumpToEditor} />
     case 'extensions':
-      return <Plugins api={api} workspace={workspace} />
+      return (
+        <Plugins
+          api={api}
+          workspace={workspace}
+          onInstallElsewhere={deps.installPluginsInUserScope}
+        />
+      )
     case 'effective':
       return workspace.kind === 'project' ? (
         <Effective api={api} projectDir={workspace.dir} onEdit={deps.jumpToEditor} />

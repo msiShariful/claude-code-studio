@@ -44,7 +44,16 @@ function filterAvailable(list: AvailablePluginDto[], query: string): AvailablePl
   )
 }
 
-export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) {
+export function Plugins({
+  api,
+  workspace,
+  onInstallElsewhere,
+}: {
+  api: Api
+  workspace: Workspace
+  /** Project scope can't install (plugins are machine-wide); this jumps to the User scope where it can. */
+  onInstallElsewhere?: () => void
+}) {
   const projectDir = workspaceProjectDir(workspace)
   const isProject = workspace.kind === 'project'
   const [data, setData] = useState<PluginsListDto | null>(null)
@@ -159,17 +168,23 @@ export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) 
             <h3>Installed plugins</h3>
             <span className="section-meta">{visiblePlugins.length}</span>
           </div>
-          {!isProject && (
-            <button className="ghost" onClick={() => setInstalling((v) => !v)}>
-              {installing ? 'Close' : '+ Install plugin'}
-            </button>
-          )}
+          {isProject
+            ? onInstallElsewhere && (
+                <button className="ghost" onClick={onInstallElsewhere}>
+                  Install in User scope →
+                </button>
+              )
+            : (
+                <button className="ghost" onClick={() => setInstalling((v) => !v)}>
+                  {installing ? 'Close' : '+ Install plugin'}
+                </button>
+              )}
         </div>
 
         {isProject && (
           <p className="dim section-sub">
-            Plugins active for this project. Install plugins and manage marketplaces from the
-            User or Global scope.
+            Plugins active for this project. Plugins are installed machine-wide, then turned on
+            per project — install or manage marketplaces from the User or Global scope.
           </p>
         )}
 
@@ -269,7 +284,7 @@ export function Plugins({ api, workspace }: { api: Api; workspace: Workspace }) 
           <EmptyState title="No plugins installed">
             <p className="dim">
               {isProject
-                ? 'No plugins are active for this project yet.'
+                ? 'No plugins are active for this project yet — install one in the User scope, then it can be turned on here.'
                 : 'Add a marketplace below, then install a plugin from it.'}
             </p>
           </EmptyState>

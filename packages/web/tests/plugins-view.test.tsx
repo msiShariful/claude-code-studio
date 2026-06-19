@@ -233,6 +233,44 @@ describe('Plugins view', () => {
     expect(screen.queryByRole('button', { name: '+ Install plugin' })).toBeNull()
   })
 
+  it('Project scope offers a button that jumps to the User scope to install plugins', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(TWO_SCOPES), { status: 200 })),
+    )
+    const onInstallElsewhere = vi.fn()
+    render(
+      <Plugins
+        api={new Api('t')}
+        workspace={{ kind: 'project', dir: '/work/app' }}
+        onInstallElsewhere={onInstallElsewhere}
+      />,
+    )
+    await screen.findByRole('region', { name: 'Installed plugins' })
+    fireEvent.click(screen.getByRole('button', { name: /Install in User scope/ }))
+    expect(onInstallElsewhere).toHaveBeenCalledTimes(1)
+  })
+
+  it('Project scope with no plugins still offers a way to install them', async () => {
+    const EMPTY = { cliFound: true, plugins: [], marketplaces: [] }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(EMPTY), { status: 200 })),
+    )
+    const onInstallElsewhere = vi.fn()
+    render(
+      <Plugins
+        api={new Api('t')}
+        workspace={{ kind: 'project', dir: '/work/app' }}
+        onInstallElsewhere={onInstallElsewhere}
+      />,
+    )
+    await screen.findByText('No plugins installed')
+    // the empty project no longer dead-ends: the install affordance is present
+    fireEvent.click(screen.getByRole('button', { name: /Install in User scope/ }))
+    expect(onInstallElsewhere).toHaveBeenCalledTimes(1)
+  })
+
   it('surfaces action results in a dismissible toast instead of a top banner', async () => {
     const fetchMock = vi.fn((url: string) => {
       if (typeof url === 'string' && url.includes('/api/plugins/marketplace')) {
