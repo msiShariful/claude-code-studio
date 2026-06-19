@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -127,38 +127,46 @@ describe('/api/plugins', () => {
     expect(res.statusCode).toBe(400)
   })
 
-  it('runs a per-project action with --scope local in the project cwd', async () => {
-    const runner = vi
-      .fn()
-      .mockResolvedValue({ command: 'c', exitCode: 0, stdout: 'done', stderr: '' }) as CliRunner
+  it('writes a per-project enable straight to the chosen project settings file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ccs-plugin-proj-'))
+    await mkdir(join(dir, '.claude'), { recursive: true })
+    // a CLI that would throw if used — proves the per-project path never touches it
+    const runner: CliRunner = vi.fn().mockRejectedValue(new Error('CLI must not be called'))
     const { app } = await fixture({ runner })
     const res = await app.inject({
       method: 'POST',
       url: '/api/plugins/action',
       headers: auth,
-      payload: {
-        action: 'disable',
-        plugin: 'superpowers@claude-plugins-official',
-        scope: 'local',
-        projectDir: '/work/app',
-      },
+      payload: { action: 'enable', plugin: 'superpowers@official', scope: 'project', projectDir: dir },
     })
     expect(res.statusCode).toBe(200)
-    expect(vi.mocked(runner).mock.calls[0][1]).toEqual([
-      'plugin',
-      'disable',
-      'superpowers@claude-plugins-official',
-      '--scope',
-      'local',
-    ])
-    expect(vi.mocked(runner).mock.calls[0][2]).toMatchObject({ cwd: '/work/app' })
+    expect(res.json()).toMatchObject({ ok: true, scope: 'project' })
+    const written = JSON.parse(await readFile(join(dir, '.claude', 'settings.json'), 'utf8'))
+    expect(written.enabledPlugins).toEqual({ 'superpowers@official': true })
   })
 
-  it('rejects a project/local action without an absolute projectDir', async () => {
+  it('disables a per-project plugin without invoking the CLI', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ccs-plugin-proj2-'))
+    await mkdir(join(dir, '.claude'), { recursive: true })
+    const runner: CliRunner = vi.fn().mockRejectedValue(new Error('CLI must not be called'))
+    const { app } = await fixture({ runner })
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/plugins/action',
+      headers: auth,
+      payload: { action: 'disable', plugin: 'frontend-design@official', scope: 'local', projectDir: dir },
+    })
+    expect(res.statusCode).toBe(200)
+    const written = JSON.parse(await readFile(join(dir, '.claude', 'settings.local.json'), 'utf8'))
+    expect(written.enabledPlugins).toEqual({ 'frontend-design@official': false })
+  })
+
+  it('rejects a project/local action without an absolute projectDir or with a bad action', async () => {
     const { app } = await fixture({ runner: listRunner() })
     for (const payload of [
       { action: 'enable', plugin: 'x@y', scope: 'local' },
       { action: 'enable', plugin: 'x@y', scope: 'project', projectDir: 'rel/path' },
+      { action: 'install', plugin: 'x@y', scope: 'project', projectDir: '/work/app' },
     ]) {
       const res = await app.inject({ method: 'POST', url: '/api/plugins/action', headers: auth, payload })
       expect(res.statusCode).toBe(400)

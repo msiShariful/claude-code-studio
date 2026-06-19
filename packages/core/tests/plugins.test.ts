@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -10,6 +10,7 @@ import {
   marketplaceAction,
   pluginAction,
   readProjectEnabledPlugins,
+  setProjectPluginEnabled,
 } from '../src/plugins.js'
 
 function jsonRunner(payload: unknown): CliRunner {
@@ -151,25 +152,6 @@ describe('pluginAction / marketplaceAction', () => {
     expect(vi.mocked(runner).mock.calls[0][1]).toEqual(['plugin', 'marketplace', 'add', 'org/repo'])
   })
 
-  it('appends --scope and runs in the project cwd for per-project actions', async () => {
-    const runner = jsonRunner({})
-    await pluginAction(runner, 'disable', 'foo@bar', { scope: 'local', cwd: '/work/app' })
-    expect(vi.mocked(runner).mock.calls[0][1]).toEqual([
-      'plugin',
-      'disable',
-      'foo@bar',
-      '--scope',
-      'local',
-    ])
-    expect(vi.mocked(runner).mock.calls[0][2]).toMatchObject({ cwd: '/work/app' })
-  })
-
-  it('rejects an unknown scope', async () => {
-    const runner = jsonRunner({})
-    await expect(
-      pluginAction(runner, 'enable', 'foo@bar', { scope: 'galaxy' as never }),
-    ).rejects.toThrow(/scope/)
-  })
 })
 
 describe('readProjectEnabledPlugins', () => {
@@ -204,5 +186,81 @@ describe('readProjectEnabledPlugins', () => {
   it('ignores non-boolean entries and a non-object enabledPlugins', async () => {
     const dir = await projectFixture({ enabledPlugins: { 'a@m': 'yes', 'b@m': true } }, {})
     expect(await readProjectEnabledPlugins(dir)).toEqual({ 'b@m': true })
+  })
+})
+
+describe('setProjectPluginEnabled', () => {
+  async function fixture(settings?: Record<string, unknown>, local?: Record<string, unknown>) {
+    const dir = await mkdtemp(join(tmpdir(), 'ccs-plugin-set-'))
+    await mkdir(join(dir, '.claude'), { recursive: true })
+    if (settings) await writeFile(join(dir, '.claude', 'settings.json'), JSON.stringify(settings))
+    if (local) await writeFile(join(dir, '.claude', 'settings.local.json'), JSON.stringify(local))
+    const backupsRoot = await mkdtemp(join(tmpdir(), 'ccs-plugin-bak-'))
+    const readEnabled = async (file: 'settings.json' | 'settings.local.json') => {
+      try {
+        return JSON.parse(await readFile(join(dir, '.claude', file), 'utf8')).enabledPlugins
+      } catch {
+        return undefined
+      }
+    }
+    return { dir, backupsRoot, readEnabled }
+  }
+
+  it('writes a brand-new override to the requested scope (shared project settings)', async () => {
+    const { dir, backupsRoot, readEnabled } = await fixture()
+    const res = await setProjectPluginEnabled(
+      { projectDir: dir, pluginId: 'a@m', enabled: false, scope: 'project' },
+      { backupsRoot },
+    )
+    expect(res.scope).toBe('project')
+    expect(await readEnabled('settings.json')).toEqual({ 'a@m': false })
+    expect(await readEnabled('settings.local.json')).toBeUndefined()
+  })
+
+  it('writes a brand-new override to the personal local settings when chosen', async () => {
+    const { dir, backupsRoot, readEnabled } = await fixture()
+    await setProjectPluginEnabled(
+      { projectDir: dir, pluginId: 'a@m', enabled: true, scope: 'local' },
+      { backupsRoot },
+    )
+    expect(await readEnabled('settings.local.json')).toEqual({ 'a@m': true })
+    expect(await readEnabled('settings.json')).toBeUndefined()
+  })
+
+  it('updates the file the entry already lives in, ignoring the requested scope', async () => {
+    // a@m is recorded in local; asking to disable "for the team" still edits local,
+    // so we never leave a conflicting entry the higher-precedence file would mask.
+    const { dir, backupsRoot, readEnabled } = await fixture(undefined, { enabledPlugins: { 'a@m': true } })
+    const res = await setProjectPluginEnabled(
+      { projectDir: dir, pluginId: 'a@m', enabled: false, scope: 'project' },
+      { backupsRoot },
+    )
+    expect(res.scope).toBe('local')
+    expect(await readEnabled('settings.local.json')).toEqual({ 'a@m': false })
+    expect(await readEnabled('settings.json')).toBeUndefined()
+  })
+
+  it('preserves other settings keys and other plugin entries', async () => {
+    const { dir, backupsRoot, readEnabled } = await fixture({
+      model: 'opus',
+      enabledPlugins: { 'a@m': true },
+    })
+    await setProjectPluginEnabled(
+      { projectDir: dir, pluginId: 'b@m', enabled: true, scope: 'project' },
+      { backupsRoot },
+    )
+    expect(await readEnabled('settings.json')).toEqual({ 'a@m': true, 'b@m': true })
+    const full = JSON.parse(await readFile(join(dir, '.claude', 'settings.json'), 'utf8'))
+    expect(full.model).toBe('opus')
+  })
+
+  it('rejects a flag-like plugin id and an unknown scope', async () => {
+    const { dir, backupsRoot } = await fixture()
+    await expect(
+      setProjectPluginEnabled({ projectDir: dir, pluginId: '--evil', enabled: true, scope: 'local' }, { backupsRoot }),
+    ).rejects.toThrow(/identifier/)
+    await expect(
+      setProjectPluginEnabled({ projectDir: dir, pluginId: 'a@m', enabled: true, scope: 'user' as never }, { backupsRoot }),
+    ).rejects.toThrow(/scope/)
   })
 })

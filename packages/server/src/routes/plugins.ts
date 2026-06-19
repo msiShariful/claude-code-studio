@@ -5,6 +5,7 @@ import {
   marketplaceAction,
   pluginAction,
   readProjectEnabledPlugins,
+  setProjectPluginEnabled,
   type CliRunResult,
   type MarketplaceActionName,
   type PluginActionName,
@@ -75,15 +76,27 @@ export function pluginsRoutes(app: FastifyInstance, ctx: ServerContext): void {
       if (scope !== undefined && !PLUGIN_SCOPES.includes(scope)) {
         return reply.code(400).send({ error: `scope must be one of ${PLUGIN_SCOPES.join(', ')}` })
       }
-      // project/local scope writes to that project's settings, so we must run the
-      // CLI in the project directory — require an absolute path for it.
+      // Per-project enable/disable writes the enabledPlugins flag straight into the
+      // project's settings file (the CLI can't target a scope or override a user-scope
+      // plugin per project). Install/uninstall and machine-wide actions still use the CLI.
       if (scope === 'project' || scope === 'local') {
+        if (action !== 'enable' && action !== 'disable') {
+          return reply.code(400).send({ error: `${action} is not supported for the ${scope} scope` })
+        }
         if (!projectDir) return reply.code(400).send({ error: 'projectDir is required for this scope' })
         if (!isAbsolute(projectDir)) return reply.code(400).send({ error: 'projectDir must be an absolute path' })
+        try {
+          const { scope: written } = await setProjectPluginEnabled(
+            { projectDir, pluginId: plugin, enabled: action === 'enable', scope },
+            { backupsRoot: ctx.backupsRoot },
+          )
+          return { ok: true, scope: written }
+        } catch (err) {
+          return reply.code(400).send({ error: (err as Error).message })
+        }
       }
       try {
-        const cwd = scope === 'project' || scope === 'local' ? projectDir : undefined
-        return sendCliResult(await pluginAction(ctx.runner, action, plugin, { scope, cwd }), reply)
+        return sendCliResult(await pluginAction(ctx.runner, action, plugin), reply)
       } catch (err) {
         return reply.code(400).send({ error: (err as Error).message })
       }

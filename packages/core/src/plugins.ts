@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { backupFile } from './backups.js'
 import type { CliRunner, CliRunResult } from './cli.js'
-import { readJsonFile } from './json-file.js'
+import { readJsonFile, writeJsonFileAtomic, type JsonFileState } from './json-file.js'
 import { getProjectPaths } from './paths.js'
 
 export interface PluginInfo {
@@ -86,12 +87,13 @@ export async function listAvailablePlugins(
 
 export type PluginActionName = 'install' | 'uninstall' | 'enable' | 'disable'
 export type MarketplaceActionName = 'add' | 'remove'
-/** Where an enable/disable/install applies: machine-wide, the project (shared), or local (personal). */
+/** Where an enable/disable applies: machine-wide, the project (shared), or local (personal). */
 export type PluginScope = 'user' | 'project' | 'local'
+/** A project's two enablement files: shared `settings.json` vs personal `settings.local.json`. */
+export type ProjectPluginScope = 'project' | 'local'
 
 const PLUGIN_ACTIONS: ReadonlySet<string> = new Set(['install', 'uninstall', 'enable', 'disable'])
 const MARKETPLACE_ACTIONS: ReadonlySet<string> = new Set(['add', 'remove'])
-const PLUGIN_SCOPES: ReadonlySet<string> = new Set(['user', 'project', 'local'])
 const SLOW_ACTIONS: ReadonlySet<string> = new Set(['install', 'add', 'update'])
 
 /** Plugin ids, marketplace names/sources: no leading dash (would parse as a flag). */
@@ -127,20 +129,22 @@ export async function pluginAction(
   runner: CliRunner,
   action: PluginActionName,
   plugin: string,
-  opts: { scope?: PluginScope; cwd?: string } = {},
 ): Promise<CliRunResult> {
   if (!PLUGIN_ACTIONS.has(action)) throw new Error(`Unknown plugin action: ${String(action)}`)
   assertIdentifier(plugin)
-  const args = ['plugin', action, plugin]
-  if (opts.scope !== undefined) {
-    if (!PLUGIN_SCOPES.has(opts.scope)) throw new Error(`Unknown plugin scope: ${String(opts.scope)}`)
-    // project/local scope resolve relative to cwd, so the runner must run there.
-    args.push('--scope', opts.scope)
-  }
-  return runner('claude', args, {
-    cwd: opts.cwd,
+  return runner('claude', ['plugin', action, plugin], {
     timeoutMs: SLOW_ACTIONS.has(action) ? 120_000 : 30_000,
   })
+}
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
+/** Does this settings file already carry an enabledPlugins entry for the plugin? */
+function hasEnabledEntry(state: JsonFileState<Record<string, unknown>>, id: string): boolean {
+  const enabled = state.value?.enabledPlugins
+  return isObject(enabled) && id in enabled
 }
 
 /**
@@ -158,12 +162,52 @@ export async function readProjectEnabledPlugins(
   for (const file of [paths.settings, paths.settingsLocal]) {
     const state = await readJsonFile<Record<string, unknown>>(file)
     const enabled = state.value?.enabledPlugins
-    if (!enabled || typeof enabled !== 'object' || Array.isArray(enabled)) continue
+    if (!isObject(enabled)) continue
     for (const [id, on] of Object.entries(enabled)) {
       if (typeof on === 'boolean') out[id] = on
     }
   }
   return out
+}
+
+/**
+ * Enable or disable a plugin for a single project by writing its `enabledPlugins`
+ * flag straight into the project's settings file — the same thing `claude plugin
+ * enable/disable` does, but done directly so we can target the team-shared
+ * `settings.json` or the personal `settings.local.json` deterministically, and so we
+ * can override a machine-wide (user-scope) plugin per project (the CLI refuses to,
+ * since the plugin isn't "installed" at project/local scope). When the plugin already
+ * has an entry in one of the files, that file is updated in place — avoiding a
+ * conflicting entry in the higher-precedence file; otherwise the requested scope is
+ * used. Writes atomically, backing up the file first.
+ */
+export async function setProjectPluginEnabled(
+  edit: { projectDir: string; pluginId: string; enabled: boolean; scope: ProjectPluginScope },
+  opts: { backupsRoot: string },
+): Promise<{ scope: ProjectPluginScope; file: string }> {
+  assertIdentifier(edit.pluginId)
+  if (edit.scope !== 'project' && edit.scope !== 'local') {
+    throw new Error(`Unknown project plugin scope: ${String(edit.scope)}`)
+  }
+  const paths = getProjectPaths(edit.projectDir)
+  const localState = await readJsonFile<Record<string, unknown>>(paths.settingsLocal)
+  const projectState = await readJsonFile<Record<string, unknown>>(paths.settings)
+  const scope: ProjectPluginScope = hasEnabledEntry(localState, edit.pluginId)
+    ? 'local'
+    : hasEnabledEntry(projectState, edit.pluginId)
+      ? 'project'
+      : edit.scope
+  const file = scope === 'local' ? paths.settingsLocal : paths.settings
+  const state = scope === 'local' ? localState : projectState
+  if (state.parseError) {
+    throw new Error(`Refusing to edit ${file}: not valid JSON (${state.parseError})`)
+  }
+  const root = structuredClone(state.value ?? {})
+  if (!isObject(root.enabledPlugins)) root.enabledPlugins = {}
+  ;(root.enabledPlugins as Record<string, unknown>)[edit.pluginId] = edit.enabled
+  await backupFile(file, opts.backupsRoot)
+  await writeJsonFileAtomic(file, root, { expectedHash: state.exists ? state.hash! : null })
+  return { scope, file }
 }
 
 export async function marketplaceAction(
