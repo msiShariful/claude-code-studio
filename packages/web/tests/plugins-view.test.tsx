@@ -219,18 +219,91 @@ describe('Plugins view', () => {
     expect(screen.getByRole('region', { name: 'Marketplaces' })).toBeDefined()
   })
 
-  it('Project scope shows only that project’s plugins and hides marketplaces', async () => {
+  it('Project scope hides marketplaces and the user-scope install toggle', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response(JSON.stringify(TWO_SCOPES), { status: 200 })),
     )
     render(<Plugins api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} />)
-    const installed = await screen.findByRole('region', { name: 'Installed plugins' })
-    expect(within(installed).getByRole('button', { name: /token-inspector/ })).toBeDefined()
-    expect(within(installed).queryByRole('button', { name: /superpowers/ })).toBeNull()
+    await screen.findByRole('region', { name: 'Installed plugins' })
     // no user-scope machinery: marketplaces section and install toggle are gone
     expect(screen.queryByRole('region', { name: 'Marketplaces' })).toBeNull()
     expect(screen.queryByRole('button', { name: '+ Install plugin' })).toBeNull()
+  })
+
+  const PROJ_LIST = {
+    cliFound: true,
+    plugins: [
+      { id: 'superpowers@official', version: '5.1.0', scope: 'user', enabled: true, installPath: '/u' },
+      { id: 'code-review@official', version: '1.0.0', scope: 'user', enabled: true, installPath: '/u2' },
+    ],
+    marketplaces: [{ name: 'official', source: 'github', repo: 'a/b', installLocation: '/m' }],
+    // code-review has been turned off for this project
+    projectEnabled: { 'code-review@official': false },
+  }
+
+  it('Project scope lists machine-wide plugins as inherited and active', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(PROJ_LIST), { status: 200 })),
+    )
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} />)
+    const installed = await screen.findByRole('region', { name: 'Installed plugins' })
+    // superpowers is inherited from User and active here
+    expect(within(installed).getByText('superpowers')).toBeDefined()
+    expect(within(installed).getByText(/From User/)).toBeDefined()
+    expect(within(installed).getByRole('button', { name: /Disable for this project/ })).toBeDefined()
+    // code-review is turned off for this project, so it isn't in the active list
+    expect(within(installed).queryByText('code-review')).toBeNull()
+  })
+
+  it('Project scope disables an inherited plugin for just this project', async () => {
+    const actionBodies: string[] = []
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (typeof url === 'string' && url.includes('/api/plugins/action')) {
+        actionBodies.push(String(init?.body))
+        return Promise.resolve(new Response(JSON.stringify({ ok: true, output: '' }), { status: 200 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify(PROJ_LIST), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} />)
+    const installed = await screen.findByRole('region', { name: 'Installed plugins' })
+    fireEvent.click(within(installed).getByRole('button', { name: /Disable for this project/ }))
+    await screen.findByText(/Disabled superpowers@official for this project/)
+    const body = JSON.parse(actionBodies[0]) as Record<string, unknown>
+    expect(body).toMatchObject({
+      action: 'disable',
+      plugin: 'superpowers@official',
+      scope: 'local',
+      projectDir: '/work/app',
+    })
+  })
+
+  it('Project scope re-enables a plugin that was turned off for the project', async () => {
+    const actionBodies: string[] = []
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (typeof url === 'string' && url.includes('/api/plugins/action')) {
+        actionBodies.push(String(init?.body))
+        return Promise.resolve(new Response(JSON.stringify({ ok: true, output: '' }), { status: 200 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify(PROJ_LIST), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} />)
+    await screen.findByRole('region', { name: 'Installed plugins' })
+    // reveal the panel of plugins turned off for this project, then re-enable code-review
+    fireEvent.click(screen.getByRole('button', { name: /Enable a plugin for this project/ }))
+    const panel = await screen.findByRole('region', { name: 'Enable for this project' })
+    fireEvent.click(within(panel).getByRole('button', { name: /^Enable/ }))
+    await screen.findByText(/Enabled code-review@official for this project/)
+    const body = JSON.parse(actionBodies[0]) as Record<string, unknown>
+    expect(body).toMatchObject({
+      action: 'enable',
+      plugin: 'code-review@official',
+      scope: 'local',
+      projectDir: '/work/app',
+    })
   })
 
   it('Project scope offers a button that jumps to the User scope to install plugins', async () => {

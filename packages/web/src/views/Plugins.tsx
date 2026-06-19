@@ -73,12 +73,13 @@ export function Plugins({
 
   const reload = useCallback(async () => {
     try {
-      setData(await api.plugins())
+      // In a project, also pull that project's per-plugin on/off overrides.
+      setData(await api.plugins(projectDir))
     } catch (e) {
       setMessage({ kind: 'error', text: (e as Error).message })
       setData({ cliFound: false, plugins: [], marketplaces: [] })
     }
-  }, [api])
+  }, [api, projectDir])
 
   useEffect(() => {
     void reload()
@@ -134,17 +135,6 @@ export function Plugins({
 
   if (!data) return <p className="dim">Loading…</p>
 
-  const catalogMatches = filterPluginCatalog(search)
-  // Global lists every plugin; User shows only user-scope; a project shows its
-  // own project/local plugins and never the user-scope ones.
-  const visiblePlugins = data.plugins.filter((p) =>
-    workspace.kind === 'global'
-      ? true
-      : workspace.kind === 'user'
-        ? p.scope === 'user'
-        : p.scope !== 'user' && (!p.projectPath || p.projectPath === projectDir),
-  )
-
   if (!data.cliFound) {
     return (
       <>
@@ -158,6 +148,32 @@ export function Plugins({
     )
   }
 
+  // A project can't install plugins (they're machine-wide); it inherits the
+  // User-scope set and toggles each one on or off for just this project.
+  if (isProject && projectDir) {
+    return (
+      <>
+        <PageHeader title="Plugins" label="Extensions" info={PLUGINS_INFO} />
+        <ProjectPlugins
+          api={api}
+          projectDir={projectDir}
+          data={data}
+          run={run}
+          pending={pending}
+          busy={busy}
+          onInstallElsewhere={onInstallElsewhere}
+        />
+        <Toast message={message} onClose={() => setMessage(null)} />
+      </>
+    )
+  }
+
+  const catalogMatches = filterPluginCatalog(search)
+  // Global lists every plugin; User shows only user-scope.
+  const visiblePlugins = data.plugins.filter((p) =>
+    workspace.kind === 'global' ? true : p.scope === 'user',
+  )
+
   return (
     <>
       <PageHeader title="Plugins" label="Extensions" info={PLUGINS_INFO} />
@@ -168,27 +184,12 @@ export function Plugins({
             <h3>Installed plugins</h3>
             <span className="section-meta">{visiblePlugins.length}</span>
           </div>
-          {isProject
-            ? onInstallElsewhere && (
-                <button className="ghost" onClick={onInstallElsewhere}>
-                  Install in User scope →
-                </button>
-              )
-            : (
-                <button className="ghost" onClick={() => setInstalling((v) => !v)}>
-                  {installing ? 'Close' : '+ Install plugin'}
-                </button>
-              )}
+          <button className="ghost" onClick={() => setInstalling((v) => !v)}>
+            {installing ? 'Close' : '+ Install plugin'}
+          </button>
         </div>
 
-        {isProject && (
-          <p className="dim section-sub">
-            Plugins active for this project. Plugins are installed machine-wide, then turned on
-            per project — install or manage marketplaces from the User or Global scope.
-          </p>
-        )}
-
-        {!isProject && installing && (
+        {installing && (
           <div className="card">
             <input
               className="catalog-search"
@@ -282,11 +283,7 @@ export function Plugins({
 
         {visiblePlugins.length === 0 ? (
           <EmptyState title="No plugins installed">
-            <p className="dim">
-              {isProject
-                ? 'No plugins are active for this project yet — install one in the User scope, then it can be turned on here.'
-                : 'Add a marketplace below, then install a plugin from it.'}
-            </p>
+            <p className="dim">Add a marketplace below, then install a plugin from it.</p>
           </EmptyState>
         ) : (
           <table className="kv">
@@ -317,7 +314,6 @@ export function Plugins({
         )}
       </section>
 
-      {!isProject && (
       <section className="section-block" aria-label="Marketplaces">
         <div className="section-head">
           <div className="section-head-title">
@@ -431,7 +427,6 @@ export function Plugins({
           </table>
         )}
       </section>
-      )}
       {confirmDialog}
       <Toast message={message} onClose={() => setMessage(null)} />
     </>
@@ -552,5 +547,177 @@ function PluginRow({
         </tr>
       )}
     </>
+  )
+}
+
+interface ProjectEntry {
+  id: string
+  version?: string
+  /** Where it's enabled from: 'user' = machine-wide (inherited), 'project' = only this project. */
+  source: 'user' | 'project'
+  active: boolean
+}
+
+/**
+ * Project-scope view: a project can't install plugins (they're machine-wide), so it
+ * shows the inherited User-scope set as active here and lets each be toggled on or off
+ * for just this project — writing the override to the project's settings.local.json.
+ */
+function ProjectPlugins({
+  api,
+  projectDir,
+  data,
+  run,
+  pending,
+  busy,
+  onInstallElsewhere,
+}: {
+  api: Api
+  projectDir: string
+  data: PluginsListDto
+  run: (fn: () => Promise<unknown>, okText: string, key: string) => Promise<boolean>
+  pending: string | null
+  busy: boolean
+  onInstallElsewhere?: () => void
+}) {
+  const [enabling, setEnabling] = useState(false)
+  const overrides = data.projectEnabled ?? {}
+
+  // Machine-wide (user-scope) plugins, deduped by id — the set inherited here.
+  const machineWide: PluginDto[] = []
+  const machineIds = new Set<string>()
+  for (const p of data.plugins) {
+    if (p.scope !== 'user' || machineIds.has(p.id)) continue
+    machineIds.add(p.id)
+    machineWide.push(p)
+  }
+
+  // Inherited plugins are active unless explicitly turned off for this project.
+  const entries: ProjectEntry[] = machineWide.map((p) => ({
+    id: p.id,
+    version: p.version,
+    source: 'user',
+    active: overrides[p.id] !== false,
+  }))
+  // Plugins enabled for this project only (local/project scope), not machine-wide.
+  for (const [id, on] of Object.entries(overrides)) {
+    if (!on || machineIds.has(id) || entries.some((e) => e.id === id)) continue
+    entries.push({ id, version: data.plugins.find((p) => p.id === id)?.version, source: 'project', active: true })
+  }
+
+  const active = entries.filter((e) => e.active)
+  const off = entries.filter((e) => !e.active)
+
+  function toggle(id: string, enable: boolean) {
+    void run(
+      () => api.pluginAction(enable ? 'enable' : 'disable', id, { scope: 'local', projectDir }),
+      `${enable ? 'Enabled' : 'Disabled'} ${id} for this project`,
+      `toggle:${id}`,
+    )
+  }
+
+  return (
+    <section className="section-block" aria-label="Installed plugins">
+      <div className="section-head">
+        <div className="section-head-title">
+          <h3>Installed plugins</h3>
+          <span className="section-meta">{active.length}</span>
+        </div>
+        <span className="toolbar" style={{ margin: 0 }}>
+          {off.length > 0 && (
+            <button className="ghost" onClick={() => setEnabling((v) => !v)}>
+              {enabling ? 'Close' : '+ Enable a plugin for this project'}
+            </button>
+          )}
+          {onInstallElsewhere && (
+            <button className="ghost" onClick={onInstallElsewhere}>
+              Install in User scope →
+            </button>
+          )}
+        </span>
+      </div>
+      <p className="dim section-sub">
+        Plugins are installed machine-wide and active in every project. Turn one off to disable it
+        for just this project (saved to its <code>.claude/settings.local.json</code>).
+      </p>
+
+      {enabling && off.length > 0 && (
+        <section className="card" aria-label="Enable for this project">
+          <p className="dim section-sub" style={{ marginTop: 0 }}>
+            Turned off for this project — re-enable any of these:
+          </p>
+          <ul className="catalog">
+            {off.map((e) => {
+              const { name, marketplace } = splitPluginId(e.id)
+              return (
+                <li className="catalog-item" key={e.id}>
+                  <div className="catalog-info">
+                    <span className="catalog-title">
+                      {name}
+                      {marketplace && <span className="catalog-meta"> · {marketplace}</span>}
+                    </span>
+                  </div>
+                  <button type="button" className="action" disabled={busy} onClick={() => toggle(e.id, true)}>
+                    {pending === `toggle:${e.id}` ? 'Enabling…' : 'Enable'}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
+
+      {active.length === 0 ? (
+        <EmptyState title="No plugins installed">
+          <p className="dim">
+            {machineWide.length === 0
+              ? 'No plugins are installed yet — install one in the User scope and it’s active here automatically.'
+              : 'Every machine-wide plugin is turned off for this project. Re-enable one above.'}
+          </p>
+        </EmptyState>
+      ) : (
+        <table className="kv">
+          <thead>
+            <tr>
+              <th>Plugin</th>
+              <th>Marketplace</th>
+              <th>Version</th>
+              <th>Source</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {active.map((e) => {
+              const { name, marketplace } = splitPluginId(e.id)
+              return (
+                <tr key={e.id}>
+                  <td className="path">{name}</td>
+                  <td className="dim">{marketplace ?? '—'}</td>
+                  <td className="dim">{e.version ?? '—'}</td>
+                  <td>
+                    <span className={`badge ${e.source === 'user' ? 'user' : 'projectLocal'}`}>
+                      {e.source === 'user' ? 'From User' : 'This project'}
+                    </span>
+                  </td>
+                  <td>
+                    <StatusPill tone="ok">active</StatusPill>
+                  </td>
+                  <td>
+                    <button className="ghost" disabled={busy} onClick={() => toggle(e.id, false)}>
+                      {pending === `toggle:${e.id}`
+                        ? 'Disabling…'
+                        : e.source === 'user'
+                          ? 'Disable for this project'
+                          : 'Disable'}
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
+    </section>
   )
 }

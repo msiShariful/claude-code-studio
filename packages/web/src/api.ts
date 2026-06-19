@@ -134,10 +134,14 @@ export interface MarketplaceDto {
   installLocation: string
 }
 
+export type PluginScope = 'user' | 'project' | 'local'
+
 export interface PluginsListDto {
   cliFound: boolean
   plugins: PluginDto[]
   marketplaces: MarketplaceDto[]
+  /** Present when a projectDir was given: per-plugin on/off overrides for that project. */
+  projectEnabled?: Record<string, boolean>
 }
 
 export interface AvailablePluginDto {
@@ -256,18 +260,23 @@ export class Api {
     return this.request('/api/mcp/remove', { method: 'POST', body: JSON.stringify(body) })
   }
 
-  plugins(): Promise<PluginsListDto> {
-    return this.request('/api/plugins')
+  plugins(projectDir?: string): Promise<PluginsListDto> {
+    const q = projectDir ? `?projectDir=${encodeURIComponent(projectDir)}` : ''
+    return this.request(`/api/plugins${q}`)
   }
 
   availablePlugins(): Promise<AvailablePluginsDto> {
     return this.request('/api/plugins/available')
   }
 
-  pluginAction(action: string, plugin: string): Promise<{ ok: boolean; output: string }> {
+  pluginAction(
+    action: string,
+    plugin: string,
+    opts: { scope?: PluginScope; projectDir?: string } = {},
+  ): Promise<{ ok: boolean; output: string }> {
     return this.request('/api/plugins/action', {
       method: 'POST',
-      body: JSON.stringify({ action, plugin }),
+      body: JSON.stringify({ action, plugin, ...opts }),
     })
   }
 

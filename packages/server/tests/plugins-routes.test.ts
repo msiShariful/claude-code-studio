@@ -106,6 +106,65 @@ describe('/api/plugins', () => {
     ])
   })
 
+  it('returns the project enablement overrides when a projectDir is given', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ccs-plugin-proj-'))
+    await mkdir(join(dir, '.claude'), { recursive: true })
+    await writeFile(
+      join(dir, '.claude', 'settings.local.json'),
+      JSON.stringify({ enabledPlugins: { 'superpowers@claude-plugins-official': false } }),
+    )
+    const { app } = await fixture({ runner: listRunner() })
+    const res = await app.inject({ url: `/api/plugins?projectDir=${encodeURIComponent(dir)}`, headers: auth })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().projectEnabled).toEqual({
+      'superpowers@claude-plugins-official': false,
+    })
+  })
+
+  it('rejects a non-absolute projectDir on the list with 400', async () => {
+    const { app } = await fixture({ runner: listRunner() })
+    const res = await app.inject({ url: '/api/plugins?projectDir=relative/path', headers: auth })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('runs a per-project action with --scope local in the project cwd', async () => {
+    const runner = vi
+      .fn()
+      .mockResolvedValue({ command: 'c', exitCode: 0, stdout: 'done', stderr: '' }) as CliRunner
+    const { app } = await fixture({ runner })
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/plugins/action',
+      headers: auth,
+      payload: {
+        action: 'disable',
+        plugin: 'superpowers@claude-plugins-official',
+        scope: 'local',
+        projectDir: '/work/app',
+      },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(vi.mocked(runner).mock.calls[0][1]).toEqual([
+      'plugin',
+      'disable',
+      'superpowers@claude-plugins-official',
+      '--scope',
+      'local',
+    ])
+    expect(vi.mocked(runner).mock.calls[0][2]).toMatchObject({ cwd: '/work/app' })
+  })
+
+  it('rejects a project/local action without an absolute projectDir', async () => {
+    const { app } = await fixture({ runner: listRunner() })
+    for (const payload of [
+      { action: 'enable', plugin: 'x@y', scope: 'local' },
+      { action: 'enable', plugin: 'x@y', scope: 'project', projectDir: 'rel/path' },
+    ]) {
+      const res = await app.inject({ method: 'POST', url: '/api/plugins/action', headers: auth, payload })
+      expect(res.statusCode).toBe(400)
+    }
+  })
+
   it('rejects unknown actions and flag-like values with 400', async () => {
     const { app } = await fixture({ runner: listRunner() })
     for (const payload of [

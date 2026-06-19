@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { CliRunner, CliRunResult } from './cli.js'
+import { readJsonFile } from './json-file.js'
+import { getProjectPaths } from './paths.js'
 
 export interface PluginInfo {
   id: string
@@ -84,9 +86,12 @@ export async function listAvailablePlugins(
 
 export type PluginActionName = 'install' | 'uninstall' | 'enable' | 'disable'
 export type MarketplaceActionName = 'add' | 'remove'
+/** Where an enable/disable/install applies: machine-wide, the project (shared), or local (personal). */
+export type PluginScope = 'user' | 'project' | 'local'
 
 const PLUGIN_ACTIONS: ReadonlySet<string> = new Set(['install', 'uninstall', 'enable', 'disable'])
 const MARKETPLACE_ACTIONS: ReadonlySet<string> = new Set(['add', 'remove'])
+const PLUGIN_SCOPES: ReadonlySet<string> = new Set(['user', 'project', 'local'])
 const SLOW_ACTIONS: ReadonlySet<string> = new Set(['install', 'add', 'update'])
 
 /** Plugin ids, marketplace names/sources: no leading dash (would parse as a flag). */
@@ -122,12 +127,43 @@ export async function pluginAction(
   runner: CliRunner,
   action: PluginActionName,
   plugin: string,
+  opts: { scope?: PluginScope; cwd?: string } = {},
 ): Promise<CliRunResult> {
   if (!PLUGIN_ACTIONS.has(action)) throw new Error(`Unknown plugin action: ${String(action)}`)
   assertIdentifier(plugin)
-  return runner('claude', ['plugin', action, plugin], {
+  const args = ['plugin', action, plugin]
+  if (opts.scope !== undefined) {
+    if (!PLUGIN_SCOPES.has(opts.scope)) throw new Error(`Unknown plugin scope: ${String(opts.scope)}`)
+    // project/local scope resolve relative to cwd, so the runner must run there.
+    args.push('--scope', opts.scope)
+  }
+  return runner('claude', args, {
+    cwd: opts.cwd,
     timeoutMs: SLOW_ACTIONS.has(action) ? 120_000 : 30_000,
   })
+}
+
+/**
+ * A project's per-plugin on/off overrides, read straight from its settings files
+ * (`enabledPlugins` map) — local settings win over shared project settings. This is
+ * the reliable source for project enablement; `claude plugin list` only reports it
+ * for projects already registered in `~/.claude.json`.
+ */
+export async function readProjectEnabledPlugins(
+  projectDir: string,
+): Promise<Record<string, boolean>> {
+  const paths = getProjectPaths(projectDir)
+  const out: Record<string, boolean> = {}
+  // project first, then local — later writes override earlier ones.
+  for (const file of [paths.settings, paths.settingsLocal]) {
+    const state = await readJsonFile<Record<string, unknown>>(file)
+    const enabled = state.value?.enabledPlugins
+    if (!enabled || typeof enabled !== 'object' || Array.isArray(enabled)) continue
+    for (const [id, on] of Object.entries(enabled)) {
+      if (typeof on === 'boolean') out[id] = on
+    }
+  }
+  return out
 }
 
 export async function marketplaceAction(

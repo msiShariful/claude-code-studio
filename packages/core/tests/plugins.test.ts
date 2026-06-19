@@ -1,3 +1,6 @@
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import type { CliRunner } from '../src/cli.js'
 import {
@@ -6,6 +9,7 @@ import {
   listPlugins,
   marketplaceAction,
   pluginAction,
+  readProjectEnabledPlugins,
 } from '../src/plugins.js'
 
 function jsonRunner(payload: unknown): CliRunner {
@@ -145,5 +149,60 @@ describe('pluginAction / marketplaceAction', () => {
     const runner = jsonRunner({})
     await marketplaceAction(runner, 'add', 'org/repo')
     expect(vi.mocked(runner).mock.calls[0][1]).toEqual(['plugin', 'marketplace', 'add', 'org/repo'])
+  })
+
+  it('appends --scope and runs in the project cwd for per-project actions', async () => {
+    const runner = jsonRunner({})
+    await pluginAction(runner, 'disable', 'foo@bar', { scope: 'local', cwd: '/work/app' })
+    expect(vi.mocked(runner).mock.calls[0][1]).toEqual([
+      'plugin',
+      'disable',
+      'foo@bar',
+      '--scope',
+      'local',
+    ])
+    expect(vi.mocked(runner).mock.calls[0][2]).toMatchObject({ cwd: '/work/app' })
+  })
+
+  it('rejects an unknown scope', async () => {
+    const runner = jsonRunner({})
+    await expect(
+      pluginAction(runner, 'enable', 'foo@bar', { scope: 'galaxy' as never }),
+    ).rejects.toThrow(/scope/)
+  })
+})
+
+describe('readProjectEnabledPlugins', () => {
+  async function projectFixture(
+    settings?: Record<string, unknown>,
+    local?: Record<string, unknown>,
+  ): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), 'ccs-plugin-proj-'))
+    await mkdir(join(dir, '.claude'), { recursive: true })
+    if (settings) await writeFile(join(dir, '.claude', 'settings.json'), JSON.stringify(settings))
+    if (local) await writeFile(join(dir, '.claude', 'settings.local.json'), JSON.stringify(local))
+    return dir
+  }
+
+  it('returns an empty map when the project has no settings', async () => {
+    const dir = await projectFixture()
+    expect(await readProjectEnabledPlugins(dir)).toEqual({})
+  })
+
+  it('reads enabledPlugins, with local settings overriding project settings', async () => {
+    const dir = await projectFixture(
+      { enabledPlugins: { 'a@m': true, 'b@m': true } },
+      { enabledPlugins: { 'b@m': false, 'c@m': true } },
+    )
+    expect(await readProjectEnabledPlugins(dir)).toEqual({
+      'a@m': true,
+      'b@m': false, // local false wins over project true
+      'c@m': true,
+    })
+  })
+
+  it('ignores non-boolean entries and a non-object enabledPlugins', async () => {
+    const dir = await projectFixture({ enabledPlugins: { 'a@m': 'yes', 'b@m': true } }, {})
+    expect(await readProjectEnabledPlugins(dir)).toEqual({ 'b@m': true })
   })
 })
