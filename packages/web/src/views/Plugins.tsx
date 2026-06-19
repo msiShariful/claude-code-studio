@@ -581,6 +581,9 @@ function ProjectPlugins({
   onInstallElsewhere?: () => void
 }) {
   const [enabling, setEnabling] = useState(false)
+  // Where per-project enable/disable writes: 'project' = .claude/settings.json
+  // (shared with the team), 'local' = .claude/settings.local.json (just me).
+  const [target, setTarget] = useState<'project' | 'local'>('local')
   const overrides = data.projectEnabled ?? {}
 
   // Machine-wide (user-scope) plugins, deduped by id — the set inherited here.
@@ -610,7 +613,7 @@ function ProjectPlugins({
 
   function toggle(id: string, enable: boolean) {
     void run(
-      () => api.pluginAction(enable ? 'enable' : 'disable', id, { scope: 'local', projectDir }),
+      () => api.pluginAction(enable ? 'enable' : 'disable', id, { scope: target, projectDir }),
       `${enable ? 'Enabled' : 'Disabled'} ${id} for this project`,
       `toggle:${id}`,
     )
@@ -637,8 +640,29 @@ function ProjectPlugins({
         </span>
       </div>
       <p className="dim section-sub">
-        Plugins are installed machine-wide and active in every project. Turn one off to disable it
-        for just this project (saved to its <code>.claude/settings.local.json</code>).
+        Plugins are installed machine-wide and active in every project. Choose where a per-project
+        change is saved, then enable or disable each plugin for this project.
+      </p>
+      <div className="scope-picker" role="group" aria-label="Where changes are saved">
+        <button
+          type="button"
+          className={target === 'project' ? 'active project' : ''}
+          onClick={() => setTarget('project')}
+        >
+          Everyone · settings.json
+        </button>
+        <button
+          type="button"
+          className={target === 'local' ? 'active projectLocal' : ''}
+          onClick={() => setTarget('local')}
+        >
+          Just me · settings.local.json
+        </button>
+      </div>
+      <p className="dim section-sub" style={{ marginTop: '-0.75rem' }}>
+        {target === 'project'
+          ? 'Changes go to the project’s shared .claude/settings.json — committed and applied for everyone on the project.'
+          : 'Changes go to .claude/settings.local.json — personal and not committed, applied only for you.'}
       </p>
 
       {enabling && off.length > 0 && (

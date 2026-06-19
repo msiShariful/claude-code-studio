@@ -280,6 +280,31 @@ describe('Plugins view', () => {
     })
   })
 
+  it('Project scope applies a change to the shared team settings when chosen', async () => {
+    const actionBodies: string[] = []
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (typeof url === 'string' && url.includes('/api/plugins/action')) {
+        actionBodies.push(String(init?.body))
+        return Promise.resolve(new Response(JSON.stringify({ ok: true, output: '' }), { status: 200 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify(PROJ_LIST), { status: 200 }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} />)
+    const installed = await screen.findByRole('region', { name: 'Installed plugins' })
+    // switch the target from "just me" (local) to the shared/team scope
+    fireEvent.click(within(installed).getByRole('button', { name: /Everyone/ }))
+    // disabling now writes to project (shared) scope
+    fireEvent.click(within(installed).getByRole('button', { name: /Disable for this project/ }))
+    await screen.findByText(/Disabled superpowers@official for this project/)
+    expect(JSON.parse(actionBodies[0])).toMatchObject({
+      action: 'disable',
+      plugin: 'superpowers@official',
+      scope: 'project',
+      projectDir: '/work/app',
+    })
+  })
+
   it('Project scope re-enables a plugin that was turned off for the project', async () => {
     const actionBodies: string[] = []
     const fetchMock = vi.fn((url: string, init?: RequestInit) => {
