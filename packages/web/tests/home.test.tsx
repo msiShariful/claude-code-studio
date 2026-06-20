@@ -34,11 +34,12 @@ describe('Home dashboard', () => {
     )
     render(<Home api={new Api('t')} workspace={{ kind: 'global' }} onOpen={() => {}} />)
     expect(await screen.findByText('Global setup')).toBeDefined()
-    // every standard tile starts in the "set up" state
+    // every standard card starts in the "set up" state
     expect(screen.getAllByText('Set up →').length).toBeGreaterThan(0)
-    expect(screen.getByText('Tools & Integrations')).toBeDefined()
+    // cards are named after their config file, like the sidebar
+    expect(screen.getByText('.mcp.json')).toBeDefined()
     // first-run guidance appears when the workspace is empty
-    expect(screen.getByText(/set up here yet/i)).toBeDefined()
+    expect(screen.getByText('A blank slate')).toBeDefined()
   })
 
   it('summarizes configured pieces with status counts', async () => {
@@ -58,13 +59,13 @@ describe('Home dashboard', () => {
       }),
     )
     render(<Home api={new Api('t')} workspace={{ kind: 'global' }} onOpen={() => {}} />)
-    expect(await screen.findByText('1 connected')).toBeDefined()
+    expect(await screen.findByText('1 server')).toBeDefined()
     expect(screen.getByText('1 event')).toBeDefined()
-    expect(screen.getByText('2 set')).toBeDefined()
+    expect(screen.getByText('2 keys')).toBeDefined()
     // the configured item names are previewed as chips
     expect(screen.getByText('figma')).toBeDefined()
     // no first-run banner once something is configured
-    expect(screen.queryByText(/set up here yet/i)).toBeNull()
+    expect(screen.queryByText('A blank slate')).toBeNull()
   })
 
   it('opens a section when its card is clicked', async () => {
@@ -79,7 +80,7 @@ describe('Home dashboard', () => {
       }),
     )
     render(<Home api={new Api('t')} workspace={{ kind: 'global' }} onOpen={onOpen} />)
-    fireEvent.click(await screen.findByText('Tools & Integrations'))
+    fireEvent.click(await screen.findByText('.mcp.json'))
     expect(onOpen).toHaveBeenCalledWith('tools')
   })
 })

@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react'
 import type { Api } from '../api.js'
-import { Card, PageHeader, StatusPill, type Tone } from '../components/ui.js'
-import { sectionByKey } from '../nav.js'
+import { Card, PageHeader } from '../components/ui.js'
+import { Glyph, type TreeIcon } from '../shell/icons.js'
 import { workspaceProjectDir, type Workspace } from '../workspace.js'
 
 interface Tile {
   section: string
+  /** the on-disk name, shown as the card's title in mono (matches the sidebar) */
+  file: string
+  icon: TreeIcon
+  /** plain-language role, a small eyebrow above the filename */
+  role: string
   status: string
-  tone: Tone
+  configured: boolean
   blurb: string
   /** names of the configured items, previewed as chips on the card */
   items: string[]
@@ -15,15 +20,23 @@ interface Tile {
 
 const LOADING: Tile[] = []
 
+const ICON_CLASS: Record<TreeIcon, string> = {
+  md: 'ic-md',
+  json: 'ic-json',
+  folder: 'ic-folder',
+  layers: 'ic-derived',
+  history: 'ic-derived',
+}
+
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
 /**
- * The landing view for a workspace: a card grid of the standard Claude setup,
- * each tile showing what is configured (with a preview of the items) and linking
- * to where you manage it. Turns "a pile of config files" into "here's what Claude
- * can do here, and what's still missing".
+ * The landing view for a workspace, drawn as the annotated `.claude/` directory:
+ * one card per config file (named in mono, like the sidebar), showing what's set up,
+ * a preview of its contents, and a way in. Turns "a pile of config files" into "here's
+ * what Claude can do here, and what's still missing".
  */
 export function Home({
   api,
@@ -67,62 +80,83 @@ export function Home({
       const agentNames = scopeFiles?.agents.map((a) => a.name) ?? []
       const skillNames = scopeFiles?.skills.map((s) => s.name) ?? []
       const hasMemory = scopeFiles?.claudeMd.exists ?? false
+      const ids = (plugins?.plugins ?? []).filter(inScope).map((p) => p.id)
 
       const count = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`
 
-      const next: Tile[] = [
+      // Ordered to read like the sidebar tree, top to bottom.
+      setTiles([
         {
-          section: 'settings',
-          status: settingKeys.length ? `${settingKeys.length} set` : 'Using defaults',
-          tone: settingKeys.length ? 'ok' : 'muted',
-          blurb: 'Model, permission rules, and environment for Claude.',
-          items: settingKeys,
+          section: 'memory',
+          file: 'CLAUDE.md',
+          icon: 'md',
+          role: 'memory',
+          status: hasMemory ? 'in use' : 'empty',
+          configured: hasMemory,
+          blurb: 'Standing instructions Claude reads at the start of every session.',
+          items: [],
         },
         {
           section: 'tools',
-          status: servers.length ? `${servers.length} connected` : 'None yet',
-          tone: servers.length ? 'ok' : 'muted',
-          blurb: 'Browsers, databases, GitHub and more, via MCP servers.',
+          file: '.mcp.json',
+          icon: 'json',
+          role: 'tools & integrations',
+          status: servers.length ? count(servers.length, 'server') : 'none yet',
+          configured: servers.length > 0,
+          blurb: 'Connect Claude to browsers, databases, GitHub and more, via MCP.',
           items: servers,
         },
         {
-          section: 'memory',
-          status: hasMemory ? 'Created' : 'None yet',
-          tone: hasMemory ? 'ok' : 'muted',
-          blurb: 'Standing instructions Claude reads every session — the CLAUDE.md file.',
-          items: hasMemory ? ['CLAUDE.md'] : [],
+          section: 'settings',
+          file: 'settings.json',
+          icon: 'json',
+          role: 'permissions & behavior',
+          status: settingKeys.length ? count(settingKeys.length, 'key') : 'defaults',
+          configured: settingKeys.length > 0,
+          blurb: 'What Claude may do and how it behaves — model, permissions, environment.',
+          items: settingKeys,
         },
         {
           section: 'agents',
-          status: agentNames.length ? count(agentNames.length, 'agent') : 'None yet',
-          tone: agentNames.length ? 'ok' : 'muted',
+          file: 'agents/',
+          icon: 'folder',
+          role: 'subagents',
+          status: agentNames.length ? count(agentNames.length, 'agent') : 'none yet',
+          configured: agentNames.length > 0,
           blurb: 'Custom subagents you can hand specialized tasks.',
           items: agentNames,
         },
         {
           section: 'skills',
-          status: skillNames.length ? count(skillNames.length, 'skill') : 'None yet',
-          tone: skillNames.length ? 'ok' : 'muted',
+          file: 'skills/',
+          icon: 'folder',
+          role: 'skills',
+          status: skillNames.length ? count(skillNames.length, 'skill') : 'none yet',
+          configured: skillNames.length > 0,
           blurb: 'Reusable skills Claude can invoke on demand.',
           items: skillNames,
         },
         {
           section: 'automation',
-          status: hookKeys.length ? count(hookKeys.length, 'event') : 'None yet',
-          tone: hookKeys.length ? 'ok' : 'muted',
-          blurb: 'Run your own commands automatically on Claude events.',
+          file: 'hooks/',
+          icon: 'folder',
+          role: 'automation',
+          status: hookKeys.length ? count(hookKeys.length, 'event') : 'none yet',
+          configured: hookKeys.length > 0,
+          blurb: 'Shell commands that run automatically on Claude’s lifecycle events.',
           items: hookKeys,
         },
-      ]
-      const ids = (plugins?.plugins ?? []).filter(inScope).map((p) => p.id)
-      next.push({
-        section: 'extensions',
-        status: ids.length ? `${ids.length} installed` : 'None yet',
-        tone: ids.length ? 'ok' : 'muted',
-        blurb: 'Bundles of agents, commands, and tools from marketplaces.',
-        items: ids,
-      })
-      setTiles(next)
+        {
+          section: 'extensions',
+          file: 'plugins/',
+          icon: 'folder',
+          role: 'extensions',
+          status: ids.length ? count(ids.length, 'plugin') : 'none yet',
+          configured: ids.length > 0,
+          blurb: 'Bundles of agents, commands, and tools installed from marketplaces.',
+          items: ids,
+        },
+      ])
     }
     void load()
     return () => {
@@ -131,7 +165,9 @@ export function Home({
   }, [api, projectDir, kind, isProject])
 
   const loading = tiles === LOADING
-  const nothingConfigured = !loading && tiles.every((t) => t.tone === 'muted')
+  const ready = tiles.filter((t) => t.configured).length
+  const nothingConfigured = !loading && ready === 0
+  const here = kind === 'global' ? 'on this machine' : kind === 'user' ? 'for your user' : 'in this project'
 
   return (
     <>
@@ -147,9 +183,18 @@ export function Home({
         }
       />
       <p className="dim home-intro">
-        Everything Claude is set up with{' '}
-        {kind === 'global' ? 'on this machine' : kind === 'user' ? 'for your user' : 'in this project'}
-        . Open any card to add, change, or remove things — no JSON editing required.
+        Everything Claude runs with {here}.{' '}
+        {!loading &&
+          (nothingConfigured ? (
+            <span className="home-count">nothing set up yet.</span>
+          ) : (
+            <>
+              <span className="home-count">
+                {ready} of {tiles.length}
+              </span>{' '}
+              set up — open a card to change it.
+            </>
+          ))}
       </p>
 
       {loading ? (
@@ -158,39 +203,41 @@ export function Home({
         <>
           {nothingConfigured && (
             <div className="home-firstrun">
-              <p className="home-firstrun-title">Claude isn’t set up here yet</p>
+              <p className="home-firstrun-title">A blank slate</p>
               <p className="dim">
-                Pick a card below to add your first tool, agent, or rule. Studio writes the config
-                for you and snapshots every change so you can always roll back.
+                Nothing is configured here yet. Open any card to add your first tool, agent, or rule —
+                Studio writes the file for you and snapshots every change so you can always roll back.
               </p>
             </div>
           )}
-          <div className="tile-grid">
-            {tiles.map((t) => {
-              const sec = sectionByKey(t.section)!
-              return (
-                <Card key={t.section} className="tile" onClick={() => onOpen(t.section)}>
-                  <div className="tile-head">
-                    <span className="tile-title">{sec.label}</span>
-                    <StatusPill tone={t.tone}>{t.status}</StatusPill>
+          <div className="home-grid">
+            {tiles.map((t) => (
+              <Card key={t.section} className="home-card" onClick={() => onOpen(t.section)}>
+                <div className="home-card-head">
+                  <span className={`ic ${ICON_CLASS[t.icon]}`}>
+                    <Glyph name={t.icon} />
+                  </span>
+                  <span className="home-card-name">{t.file}</span>
+                  <span className={`home-card-status ${t.configured ? 'on' : 'off'}`}>
+                    <span className="home-dot" aria-hidden="true" />
+                    {t.status}
+                  </span>
+                </div>
+                <span className="home-card-role">{t.role}</span>
+                <p className="home-card-blurb">{t.blurb}</p>
+                {t.items.length > 0 && (
+                  <div className="home-card-chips">
+                    {t.items.slice(0, 3).map((name) => (
+                      <span className="chip" key={name}>
+                        {name}
+                      </span>
+                    ))}
+                    {t.items.length > 3 && <span className="chip more">+{t.items.length - 3}</span>}
                   </div>
-                  <p className="tile-blurb">{t.blurb}</p>
-                  {t.items.length > 0 && (
-                    <div className="tile-items">
-                      {t.items.slice(0, 3).map((name) => (
-                        <span className="chip" key={name}>
-                          {name}
-                        </span>
-                      ))}
-                      {t.items.length > 3 && (
-                        <span className="chip more">+{t.items.length - 3}</span>
-                      )}
-                    </div>
-                  )}
-                  <span className="tile-cta">{t.tone === 'muted' ? 'Set up →' : 'Manage →'}</span>
-                </Card>
-              )
-            })}
+                )}
+                <span className="home-card-cta">{t.configured ? 'Manage →' : 'Set up →'}</span>
+              </Card>
+            ))}
           </div>
         </>
       )}
