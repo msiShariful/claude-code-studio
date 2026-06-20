@@ -89,6 +89,15 @@ export function Files({
     setMessage(null)
   }, [reload])
 
+  // Single-file views (CLAUDE.md, keybindings) open straight into the editor —
+  // there's nothing to list, so no "Open" button: just edit it.
+  const isSingle = kind === 'claudeMd' || kind === 'keybindings'
+  useEffect(() => {
+    if (!isSingle || !listing || open) return
+    void openFile(kind)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSingle, listing, kind])
+
   const scopeFiles = fileScope === 'user' ? listing?.user : listing?.project
 
   async function openFile(fileKind: FileKind, name?: string) {
@@ -163,8 +172,6 @@ export function Files({
 
   const header = HEADERS[kind]
   const isList = kind === 'agent' || kind === 'skill'
-  const singleFile = kind === 'claudeMd' ? scopeFiles?.claudeMd : kind === 'keybindings' ? listing.user.keybindings : undefined
-
   const list = kind === 'agent' ? scopeFiles?.agents : kind === 'skill' ? scopeFiles?.skills : undefined
 
   return (
@@ -181,11 +188,7 @@ export function Files({
                 {creating ? 'Cancel' : `+ New ${kind}`}
               </button>
             </>
-          ) : (
-            <button className="ghost" onClick={() => void openFile(kind)}>
-              {singleFile?.exists ? `Open ${header.title}` : `Create ${header.title}`}
-            </button>
-          )
+          ) : undefined
         }
       />
       {message && <div className={`alert ${message.kind}`}>{message.text}</div>}
@@ -207,8 +210,6 @@ export function Files({
           </button>
         </div>
       )}
-
-      {!isList && <p className="dim">{singleFile?.path}</p>}
 
       {/* The editor sits above the list so opening or creating a file is front-and-centre,
           even when the list below is long. */}
@@ -235,16 +236,18 @@ export function Files({
             <button className="action" disabled={busy || !dirty} onClick={() => void save()}>
               Save
             </button>
-            <button
-              className="ghost"
-              onClick={() => {
-                if (!confirmDiscard()) return
-                setOpen(null)
-                setDirty(false)
-              }}
-            >
-              Close
-            </button>
+            {isList && (
+              <button
+                className="ghost"
+                onClick={() => {
+                  if (!confirmDiscard()) return
+                  setOpen(null)
+                  setDirty(false)
+                }}
+              >
+                Close
+              </button>
+            )}
           </div>
         </div>
       )}

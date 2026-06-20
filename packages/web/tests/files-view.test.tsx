@@ -81,17 +81,21 @@ describe('Files view', () => {
     expect(screen.queryByText('reviewer.md')).toBeNull()
   })
 
-  it('the memory view offers to create CLAUDE.md', async () => {
+  it('the memory view auto-opens the editor (no Open button)', async () => {
     vi.stubGlobal('fetch', stub())
     render(<Files api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} kind="claudeMd" />)
-    // project CLAUDE.md does not exist yet → a Create action
-    expect(await screen.findByRole('button', { name: 'Create CLAUDE.md' })).toBeDefined()
+    // the editor opens straight away with the file content
+    expect(await screen.findByDisplayValue('# Reviewer')).toBeDefined()
+    expect(screen.queryByRole('button', { name: /Open|Create/ })).toBeNull()
+    // single-file views are the editor — no Close
+    expect(screen.queryByText('Close')).toBeNull()
   })
 
-  it('the keybindings view offers to create keybindings.json', async () => {
+  it('the keybindings view auto-opens the editor', async () => {
     vi.stubGlobal('fetch', stub())
     render(<Files api={new Api('t')} workspace={{ kind: 'global' }} kind="keybindings" />)
-    expect(await screen.findByRole('button', { name: 'Create Keybindings' })).toBeDefined()
+    expect(await screen.findByDisplayValue('# Reviewer')).toBeDefined()
+    expect(screen.queryByRole('button', { name: /Open|Create/ })).toBeNull()
   })
 
   it('asks before discarding unsaved changes when closing the editor', async () => {

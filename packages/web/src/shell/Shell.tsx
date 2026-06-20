@@ -270,7 +270,9 @@ function renderSection(section: string, workspace: Workspace, api: Api, deps: Vi
     case 'agents':
     case 'skills':
     case 'keybindings':
-      return <Files api={api} workspace={workspace} kind={FILE_SECTION_KIND[section]} />
+      // key by section so each file view gets a fresh Files instance (these four
+      // sections all render <Files>, so without a key its state would leak across them)
+      return <Files key={section} api={api} workspace={workspace} kind={FILE_SECTION_KIND[section]} />
     case 'automation':
       return <Hooks api={api} workspace={workspace} onEdit={deps.jumpToEditor} />
     case 'extensions':
