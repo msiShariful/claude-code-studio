@@ -4,6 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Api } from '../src/api.js'
 import { Hooks } from '../src/views/Hooks.js'
 
+// The hook JSON previews use the CodeMirror viewer, which needs layout APIs jsdom
+// lacks; stand in a <pre> showing the raw text so these tests can match on it.
+vi.mock('../src/components/CodeEditor.js', () => ({
+  CodeEditor: ({ value }: { value: string }) => <pre className="code">{value}</pre>,
+}))
+
 const SETTINGS = {
   entries: [
     {
@@ -47,7 +53,8 @@ describe('Hooks view', () => {
     const onEdit = vi.fn()
     render(<Hooks api={new Api('t')} workspace={{ kind: 'global' }} onEdit={onEdit} />)
     expect(await screen.findByText('PreToolUse')).toBeDefined()
-    expect(screen.getByText(/echo hi/)).toBeDefined()
+    // the JSON preview is lazy (CodeMirror chunk) — await it
+    expect(await screen.findByText(/echo hi/)).toBeDefined()
     // project-scope hook config must not leak into the global workspace
     expect(screen.queryByText(/say done/)).toBeNull()
     fireEvent.click(screen.getAllByText('Edit in Editor')[0])

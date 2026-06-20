@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../src/App.js'
 import { encodeProjectId } from '../src/workspace.js'
@@ -74,13 +74,13 @@ describe('App shell', () => {
     window.history.pushState({}, '', '/')
   })
 
-  it('lands on the global Home with the section nav', async () => {
+  it('lands on the global Home with the file-tree nav', async () => {
     vi.stubGlobal('fetch', stubFetch())
     render(<App token="t" />)
     const nav = screen.getByRole('navigation', { name: 'Sections' })
-    // plain-language section labels, not jargon
-    expect(within(nav).getByText('Permissions & Behavior')).toBeDefined()
-    expect(within(nav).getByText('Tools & Integrations')).toBeDefined()
+    // the nav is the real .claude/ tree — filenames, with .claude/ open by default
+    expect(within(nav).getByText('settings.json')).toBeDefined()
+    expect(within(nav).getByText('.mcp.json')).toBeDefined()
     // global Home dashboard
     expect(await screen.findByText('Global setup')).toBeDefined()
     expect(window.location.pathname).toBe('/global')
@@ -90,7 +90,7 @@ describe('App shell', () => {
     vi.stubGlobal('fetch', stubFetch())
     render(<App token="t" />)
     const nav = screen.getByRole('navigation', { name: 'Sections' })
-    fireEvent.click(within(nav).getByText('Tools & Integrations'))
+    fireEvent.click(within(nav).getByText('.mcp.json'))
     expect(await screen.findByRole('heading', { name: 'MCP servers' })).toBeDefined()
     expect(window.location.pathname).toBe('/global/tools')
   })
@@ -160,6 +160,43 @@ describe('App shell', () => {
     fireEvent.click(await screen.findByText('model'))
     expect(await screen.findByDisplayValue('model')).toBeDefined()
     expect(window.location.pathname).toBe('/user/settings')
+  })
+
+  it('mirrors the Settings tab in the sidebar highlight (tab → tree)', async () => {
+    window.history.pushState({}, '', `/project/${APP_ID}/settings`)
+    vi.stubGlobal('fetch', stubFetch())
+    render(<App token="t" />)
+    const nav = screen.getByRole('navigation', { name: 'Sections' })
+    const row = (label: string) => within(nav).getByText(label).closest('button')!
+    // default project tab → settings.json glows
+    await screen.findByRole('button', { name: 'projectLocal' })
+    await waitFor(() => expect(row('settings.json').className).toContain('active'))
+    // clicking the projectLocal tab moves the highlight to settings.local.json
+    fireEvent.click(screen.getByRole('button', { name: 'projectLocal' }))
+    await waitFor(() => expect(row('settings.local.json').className).toContain('active'))
+    expect(row('settings.json').className).not.toContain('active')
+  })
+
+  it('routes file nodes to their own sections, each with only that content', async () => {
+    window.history.pushState({}, '', `/project/${APP_ID}`)
+    vi.stubGlobal('fetch', stubFetch())
+    render(<App token="t" />)
+    const nav = screen.getByRole('navigation', { name: 'Sections' })
+    const treeRow = (label: string) => within(nav).getByText(label).closest('button')!
+
+    // agents/ opens the Agents view (no in-view tab bar) and lights its own row
+    fireEvent.click(within(nav).getByText('agents/'))
+    expect(await screen.findByRole('heading', { name: 'Agents' })).toBeDefined()
+    expect(window.location.pathname).toBe(`/project/${APP_ID}/agents`)
+    expect(treeRow('agents/').className).toContain('active')
+    expect(screen.queryByRole('button', { name: 'Skills' })).toBeNull()
+
+    // skills/ is a separate section with its own URL and content
+    fireEvent.click(within(nav).getByText('skills/'))
+    expect(await screen.findByRole('heading', { name: 'Skills' })).toBeDefined()
+    expect(window.location.pathname).toBe(`/project/${APP_ID}/skills`)
+    await waitFor(() => expect(treeRow('skills/').className).toContain('active'))
+    expect(treeRow('agents/').className).not.toContain('active')
   })
 
   it('switches to the User scope from the workspace switcher', async () => {

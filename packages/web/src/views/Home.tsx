@@ -64,12 +64,9 @@ export function Home({
       const hookKeys = isObj(effective.hooks) ? Object.keys(effective.hooks) : []
       const servers = (mcp?.servers ?? []).filter(inScope).map((s) => s.name)
       const scopeFiles = isProject ? files?.project : files?.user
-      const agentNames = [
-        ...(scopeFiles?.agents.map((a) => a.name) ?? []),
-        ...(scopeFiles?.skills.map((s) => s.name) ?? []),
-      ]
+      const agentNames = scopeFiles?.agents.map((a) => a.name) ?? []
+      const skillNames = scopeFiles?.skills.map((s) => s.name) ?? []
       const hasMemory = scopeFiles?.claudeMd.exists ?? false
-      const agentItems = [...(hasMemory ? ['CLAUDE.md'] : []), ...agentNames]
 
       const count = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`
 
@@ -89,11 +86,25 @@ export function Home({
           items: servers,
         },
         {
+          section: 'memory',
+          status: hasMemory ? 'Created' : 'None yet',
+          tone: hasMemory ? 'ok' : 'muted',
+          blurb: 'Standing instructions Claude reads every session — the CLAUDE.md file.',
+          items: hasMemory ? ['CLAUDE.md'] : [],
+        },
+        {
           section: 'agents',
-          status: agentItems.length ? count(agentItems.length, 'item') : 'None yet',
-          tone: agentItems.length ? 'ok' : 'muted',
-          blurb: 'Custom agents, reusable skills, and CLAUDE.md memory.',
-          items: agentItems,
+          status: agentNames.length ? count(agentNames.length, 'agent') : 'None yet',
+          tone: agentNames.length ? 'ok' : 'muted',
+          blurb: 'Custom subagents you can hand specialized tasks.',
+          items: agentNames,
+        },
+        {
+          section: 'skills',
+          status: skillNames.length ? count(skillNames.length, 'skill') : 'None yet',
+          tone: skillNames.length ? 'ok' : 'muted',
+          blurb: 'Reusable skills Claude can invoke on demand.',
+          items: skillNames,
         },
         {
           section: 'automation',

@@ -1,22 +1,45 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { ApiError, type Api, type FileKind, type FileScope, type FilesListingDto } from '../api.js'
+import type { CodeLanguage } from '../components/CodeEditor.js'
 import { PageHeader } from '../components/ui.js'
 import { workspaceProjectDir, type Workspace } from '../workspace.js'
 
-const GLOBAL_TABS = [
-  ['claudeMd', 'CLAUDE.md'],
-  ['agent', 'Agents'],
-  ['skill', 'Skills'],
-  ['keybindings', 'Keybindings'],
-] as const
+// CodeMirror is heavy — split it into its own chunk loaded only when a file is opened.
+const CodeEditor = lazy(() =>
+  import('../components/CodeEditor.js').then((m) => ({ default: m.CodeEditor })),
+)
 
-const PROJECT_TABS = [
-  ['claudeMd', 'CLAUDE.md'],
-  ['agent', 'Agents'],
-  ['skill', 'Skills'],
-] as const
+/** keybindings is JSON; everything else we edit here is Markdown. */
+const LANGUAGE: Record<FileKind, CodeLanguage> = {
+  claudeMd: 'markdown',
+  agent: 'markdown',
+  skill: 'markdown',
+  keybindings: 'json',
+}
 
-type Tab = (typeof GLOBAL_TABS)[number][0]
+/** Each file kind is its own view now (the sidebar tree is the navigation). */
+const HEADERS: Record<FileKind, { title: string; label: string; info: string }> = {
+  claudeMd: {
+    title: 'CLAUDE.md',
+    label: 'Memory',
+    info: 'Standing instructions Claude reads every session — the CLAUDE.md memory file.',
+  },
+  agent: {
+    title: 'Agents',
+    label: 'Agents',
+    info: 'Custom subagents you can hand specialized tasks. One Markdown file each.',
+  },
+  skill: {
+    title: 'Skills',
+    label: 'Skills',
+    info: 'Reusable skills Claude can invoke on demand, each a SKILL.md with frontmatter.',
+  },
+  keybindings: {
+    title: 'Keybindings',
+    label: 'Keybindings',
+    info: 'Your own keyboard shortcuts for Claude Code, stored in ~/.claude/keybindings.json.',
+  },
+}
 
 interface Open {
   kind: FileKind
@@ -27,12 +50,23 @@ interface Open {
   path: string
 }
 
-export function Files({ api, workspace }: { api: Api; workspace: Workspace }) {
+/**
+ * A single file view, chosen by the sidebar (`kind`): the CLAUDE.md memory file, the
+ * agents list, the skills list, or the keybindings file. No in-view tabs — each tree
+ * node routes straight to its own content.
+ */
+export function Files({
+  api,
+  workspace,
+  kind,
+}: {
+  api: Api
+  workspace: Workspace
+  kind: FileKind
+}) {
   const projectDir = workspaceProjectDir(workspace)
-  const tabs = workspace.kind === 'project' ? PROJECT_TABS : GLOBAL_TABS
   const fileScope: FileScope = workspace.kind === 'project' ? 'project' : 'user'
   const [listing, setListing] = useState<FilesListingDto | null>(null)
-  const [tab, setTab] = useState<Tab>('claudeMd')
   const [open, setOpen] = useState<Open | null>(null)
   const [dirty, setDirty] = useState(false)
   const [newName, setNewName] = useState('')
@@ -56,11 +90,11 @@ export function Files({ api, workspace }: { api: Api; workspace: Workspace }) {
 
   const scopeFiles = fileScope === 'user' ? listing?.user : listing?.project
 
-  async function openFile(kind: FileKind, name?: string) {
+  async function openFile(fileKind: FileKind, name?: string) {
     setMessage(null)
     try {
       const ref = {
-        kind,
+        kind: fileKind,
         scope: fileScope,
         name,
         projectDir: fileScope === 'project' ? projectDir : undefined,
@@ -109,7 +143,6 @@ export function Files({ api, workspace }: { api: Api; workspace: Workspace }) {
   }
 
   function createNew() {
-    const kind = tab as FileKind
     const name = kind === 'agent' && !newName.endsWith('.md') ? `${newName}.md` : newName
     setOpen({
       kind,
@@ -125,54 +158,30 @@ export function Files({ api, workspace }: { api: Api; workspace: Workspace }) {
 
   if (!listing) return <p className="dim">Loading…</p>
 
+  const header = HEADERS[kind]
+  const isList = kind === 'agent' || kind === 'skill'
+  const singleFile = kind === 'claudeMd' ? scopeFiles?.claudeMd : kind === 'keybindings' ? listing.user.keybindings : undefined
+
   return (
     <>
-      <PageHeader
-        title="Agents & files"
-        label="Agents & Files"
-        info="Custom agents, reusable skills, and the CLAUDE.md memory files that give Claude standing instructions."
-      />
-      <div className="scope-picker">
-        {tabs.map(([key, label]) => (
-          <button
-            key={key}
-            className={tab === key ? 'active projectLocal' : ''}
-            onClick={() => {
-              if (!confirmDiscard()) return
-              setTab(key)
-              setOpen(null)
-              setDirty(false)
-              setMessage(null)
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
+      <PageHeader title={header.title} label={header.label} info={header.info} />
       {message && <div className={`alert ${message.kind}`}>{message.text}</div>}
-      <>
-        {tab === 'claudeMd' && (
-          <div className="toolbar">
-            <button className="ghost" onClick={() => void openFile('claudeMd')}>
-              {scopeFiles?.claudeMd.exists ? 'Open CLAUDE.md' : 'Create CLAUDE.md'}
-            </button>
-            <span className="dim">{scopeFiles?.claudeMd.path}</span>
-          </div>
-        )}
-        {tab === 'keybindings' && (
-          <div className="toolbar">
-            <button className="ghost" onClick={() => void openFile('keybindings')}>
-              {listing.user.keybindings?.exists ? 'Open keybindings.json' : 'Create keybindings.json'}
-            </button>
-            <span className="dim">{listing.user.keybindings?.path}</span>
-          </div>
-        )}
-        {(tab === 'agent' || tab === 'skill') && (
-          <>
-            {(() => {
-              const list = tab === 'agent' ? scopeFiles?.agents : scopeFiles?.skills
-              return list?.length === 0 ? (
+
+      {!isList && (
+        <div className="toolbar">
+          <button className="ghost" onClick={() => void openFile(kind)}>
+            {singleFile?.exists ? `Open ${header.title}` : `Create ${header.title}`}
+          </button>
+          <span className="dim">{singleFile?.path}</span>
+        </div>
+      )}
+
+      {isList &&
+        (() => {
+          const list = kind === 'agent' ? scopeFiles?.agents : scopeFiles?.skills
+          return (
+            <>
+              {list?.length === 0 ? (
                 <p className="dim">None yet.</p>
               ) : (
                 <table className="kv">
@@ -180,7 +189,7 @@ export function Files({ api, workspace }: { api: Api; workspace: Workspace }) {
                     {list?.map((f) => (
                       <tr key={f.name}>
                         <td className="path">
-                          <button className="ghost" onClick={() => void openFile(tab, f.name)}>
+                          <button className="ghost" onClick={() => void openFile(kind, f.name)}>
                             {f.name}
                           </button>
                         </td>
@@ -189,55 +198,56 @@ export function Files({ api, workspace }: { api: Api; workspace: Workspace }) {
                     ))}
                   </tbody>
                 </table>
-              )
-            })()}
-            <div className="toolbar">
-              <input
-                placeholder={tab === 'agent' ? 'new-agent-name' : 'new-skill-name'}
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-              />
-              <button className="ghost" disabled={!newName.trim()} onClick={createNew}>
-                + New {tab}
-              </button>
-            </div>
-          </>
-        )}
+              )}
+              <div className="toolbar">
+                <input
+                  placeholder={kind === 'agent' ? 'new-agent-name' : 'new-skill-name'}
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                />
+                <button className="ghost" disabled={!newName.trim()} onClick={createNew}>
+                  + New {kind}
+                </button>
+              </div>
+            </>
+          )
+        })()}
 
-        {open && (
-          <>
-            <p className="dim">
-              {open.path}
-              {dirty ? ' — unsaved changes' : ''}
-            </p>
-            <textarea
-              rows={18}
-              style={{ width: '100%', resize: 'vertical' }}
+      {open && (
+        <>
+          <p className="dim">
+            {open.path}
+            {dirty ? ' — unsaved changes' : ''}
+          </p>
+          <Suspense fallback={<p className="dim">Loading editor…</p>}>
+            <CodeEditor
+              key={`${open.kind}:${open.name ?? ''}:${open.path}`}
               value={open.content}
+              language={LANGUAGE[open.kind]}
               disabled={busy}
-              onChange={(e) => {
-                setOpen((prev) => (prev ? { ...prev, content: e.target.value } : prev))
+              onChange={(next) => {
+                setOpen((prev) => (prev ? { ...prev, content: next } : prev))
                 setDirty(true)
               }}
             />
-            <div className="toolbar">
-              <button className="action" disabled={busy || !dirty} onClick={() => void save()}>
-                Save
-              </button>
-              <button
-                className="ghost"
-                onClick={() => {
-                  if (!confirmDiscard()) return
-                  setOpen(null)
-                  setDirty(false)
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </>
-        )}
-      </>
+          </Suspense>
+          <div className="toolbar">
+            <button className="action" disabled={busy || !dirty} onClick={() => void save()}>
+              Save
+            </button>
+            <button
+              className="ghost"
+              onClick={() => {
+                if (!confirmDiscard()) return
+                setOpen(null)
+                setDirty(false)
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </>
+      )}
     </>
   )
 }

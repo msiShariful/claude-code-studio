@@ -9,9 +9,10 @@ import {
   type Workspace,
 } from '../workspace.js'
 import { Backups } from '../views/Backups.js'
-import { Editor, type EditableScope, type EditorJump } from '../views/Editor.js'
+import { Editor, type EditableScope, type EditorJump, type EditorScope } from '../views/Editor.js'
 import { Effective } from '../views/Effective.js'
 import { Files } from '../views/Files.js'
+import type { FileKind } from '../api.js'
 import { Home } from '../views/Home.js'
 import { Hooks } from '../views/Hooks.js'
 import { Mcp } from '../views/Mcp.js'
@@ -74,6 +75,8 @@ export function Shell({ api }: { api: Api }) {
   const [projects, setProjects] = useState<ProjectDto[] | null>(null)
   const [extras, setExtras] = useState<string[]>(loadExtras)
   const [editorJump, setEditorJump] = useState<EditorJump | null>(null)
+  // the settings scope tab the Editor currently shows — mirrored in the sidebar
+  const [settingsScope, setSettingsScope] = useState<EditorScope | null>(null)
   const [cli, setCli] = useState<HealthDto['cli'] | null>(null)
 
   useEffect(() => {
@@ -201,7 +204,14 @@ export function Shell({ api }: { api: Api }) {
 
       <div className="body">
         <aside className="sidebar">
-          <Sidebar kind={workspace.kind} active={section} onOpen={go} />
+          <Sidebar
+            workspace={workspace}
+            api={api}
+            active={section}
+            settingsScope={section === 'settings' ? settingsScope : null}
+            onOpen={go}
+            onEditSettings={(scope) => jumpToEditor(scope, '')}
+          />
         </aside>
         <main className="content" key={workspace.kind === 'project' ? workspace.dir : workspace.kind}>
           {workspace.kind === 'project' && activeProject && !activeProject.exists && (
@@ -212,6 +222,7 @@ export function Shell({ api }: { api: Api }) {
           {renderSection(section, workspace, api, {
             editorJump,
             onJumpConsumed,
+            onScopeChange: setSettingsScope,
             jumpToEditor,
             go,
             installPluginsInUserScope,
@@ -225,9 +236,18 @@ export function Shell({ api }: { api: Api }) {
 interface ViewDeps {
   editorJump: EditorJump | null
   onJumpConsumed: () => void
+  onScopeChange: (scope: EditorScope) => void
   jumpToEditor: (scope: EditableScope, path: string) => void
   go: (section: string) => void
   installPluginsInUserScope: () => void
+}
+
+/** The four file views all use <Files>, differing only in which kind they show. */
+const FILE_SECTION_KIND: Record<string, FileKind> = {
+  memory: 'claudeMd',
+  agents: 'agent',
+  skills: 'skill',
+  keybindings: 'keybindings',
 }
 
 function renderSection(section: string, workspace: Workspace, api: Api, deps: ViewDeps) {
@@ -241,12 +261,16 @@ function renderSection(section: string, workspace: Workspace, api: Api, deps: Vi
           workspace={workspace}
           jump={deps.editorJump}
           onJumpConsumed={deps.onJumpConsumed}
+          onScopeChange={deps.onScopeChange}
         />
       )
     case 'tools':
       return <Mcp api={api} workspace={workspace} />
+    case 'memory':
     case 'agents':
-      return <Files api={api} workspace={workspace} />
+    case 'skills':
+    case 'keybindings':
+      return <Files api={api} workspace={workspace} kind={FILE_SECTION_KIND[section]} />
     case 'automation':
       return <Hooks api={api} workspace={workspace} onEdit={deps.jumpToEditor} />
     case 'extensions':

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError, type Api, type PendingChangeDto, type SettingsResponse } from '../api.js'
-import { JsonView } from '../components/JsonView.js'
+import { JsonViewer } from '../components/JsonViewer.js'
 import { PageHeader } from '../components/ui.js'
 import { diffLineKind, parseEditValue } from '../utils.js'
 import { workspaceProjectDir, type Workspace } from '../workspace.js'
@@ -32,17 +32,25 @@ export function Editor({
   workspace,
   jump,
   onJumpConsumed,
+  onScopeChange,
 }: {
   api: Api
   workspace: Workspace
   jump?: EditorJump | null
   onJumpConsumed?: () => void
+  /** report the open scope tab up so the sidebar can mirror it (settings.json vs .local) */
+  onScopeChange?: (scope: EditorScope) => void
 }) {
   const projectDir = workspaceProjectDir(workspace)
   const tabs = scopeTabs(workspace)
   // Invariant: scope ∈ tabs. The shell remounts this component (key per
   // workspace) on every workspace switch, so scope never outlives its tabs.
   const [scope, setScope] = useState<EditorScope>(tabs[0])
+
+  // Keep the shell in sync with the active tab — on mount, on tab click, and on jump.
+  useEffect(() => {
+    onScopeChange?.(scope)
+  }, [scope, onScopeChange])
   const [data, setData] = useState<SettingsResponse | null>(null)
   const [rows, setRows] = useState<EditRow[]>([EMPTY_ROW])
   const [pending, setPending] = useState<PendingChangeDto | null>(null)
@@ -166,7 +174,7 @@ export function Editor({
             Managed settings are machine-level policy and read-only — Studio never writes them.
           </div>
           {entry?.state.raw ? (
-            <JsonView raw={entry.state.raw} />
+            <JsonViewer value={entry.state.raw} />
           ) : (
             <pre className="code">(file does not exist)</pre>
           )}
@@ -179,7 +187,7 @@ export function Editor({
       ) : (
         <>
           {entry?.state.raw ? (
-            <JsonView raw={entry.state.raw} />
+            <JsonViewer value={entry.state.raw} />
           ) : (
             <pre className="code">(file does not exist yet)</pre>
           )}

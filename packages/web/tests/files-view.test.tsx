@@ -4,6 +4,22 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Api } from '../src/api.js'
 import { Files } from '../src/views/Files.js'
 
+// CodeMirror needs real layout APIs jsdom lacks; stand in a plain textarea that
+// preserves the value/onChange contract so these tests exercise the view, not CM.
+vi.mock('../src/components/CodeEditor.js', () => ({
+  CodeEditor: ({
+    value,
+    onChange,
+    disabled,
+  }: {
+    value: string
+    onChange: (next: string) => void
+    disabled?: boolean
+  }) => (
+    <textarea value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} />
+  ),
+}))
+
 const LISTING = {
   user: {
     claudeMd: { path: '/h/.claude/CLAUDE.md', exists: true },
@@ -33,38 +49,48 @@ describe('Files view', () => {
     vi.unstubAllGlobals()
   })
 
-  it('global workspace lists user agents and opens one', async () => {
+  it('the agents view lists user agents and opens one (no tab bar)', async () => {
     vi.stubGlobal('fetch', stub())
-    render(<Files api={new Api('t')} workspace={{ kind: 'global' }} />)
-    fireEvent.click(await screen.findByText('Agents'))
+    render(<Files api={new Api('t')} workspace={{ kind: 'global' }} kind="agent" />)
+    // no in-view tabs — the sidebar is the navigation now
+    expect(screen.queryByRole('button', { name: 'Skills' })).toBeNull()
     fireEvent.click(await screen.findByText('reviewer.md'))
     expect(await screen.findByDisplayValue('# Reviewer')).toBeDefined()
     expect(screen.getByText('Save')).toBeDefined()
-    // keybindings is a global-only tab
-    expect(screen.getByText('Keybindings')).toBeDefined()
   })
 
-  it('project workspace lists project agents and hides keybindings', async () => {
+  it('the agents view in a project lists project agents only', async () => {
     vi.stubGlobal('fetch', stub())
-    render(<Files api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} />)
-    fireEvent.click(await screen.findByText('Agents'))
+    render(<Files api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} kind="agent" />)
     expect(await screen.findByText('deployer.md')).toBeDefined()
     expect(screen.queryByText('reviewer.md')).toBeNull()
-    expect(screen.queryByText('Keybindings')).toBeNull()
   })
 
-  it('asks before discarding unsaved changes on tab switch', async () => {
+  it('the memory view offers to create CLAUDE.md', async () => {
+    vi.stubGlobal('fetch', stub())
+    render(<Files api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} kind="claudeMd" />)
+    // project CLAUDE.md does not exist yet → a Create action
+    expect(await screen.findByRole('button', { name: 'Create CLAUDE.md' })).toBeDefined()
+  })
+
+  it('the keybindings view offers to create keybindings.json', async () => {
+    vi.stubGlobal('fetch', stub())
+    render(<Files api={new Api('t')} workspace={{ kind: 'global' }} kind="keybindings" />)
+    expect(await screen.findByRole('button', { name: 'Create Keybindings' })).toBeDefined()
+  })
+
+  it('asks before discarding unsaved changes when closing the editor', async () => {
     vi.stubGlobal('fetch', stub())
     const confirmSpy = vi.fn().mockReturnValue(false)
     vi.stubGlobal('confirm', confirmSpy)
-    render(<Files api={new Api('t')} workspace={{ kind: 'global' }} />)
-    fireEvent.click(await screen.findByText('Agents'))
+    render(<Files api={new Api('t')} workspace={{ kind: 'global' }} kind="agent" />)
     fireEvent.click(await screen.findByText('reviewer.md'))
     const textarea = await screen.findByDisplayValue('# Reviewer')
     fireEvent.change(textarea, { target: { value: '# Edited' } })
 
-    fireEvent.click(screen.getByText('Skills'))
+    fireEvent.click(screen.getByText('Close'))
     expect(confirmSpy).toHaveBeenCalled()
+    // confirm denied → the edit is still open
     expect(screen.getByDisplayValue('# Edited')).toBeDefined()
   })
 })

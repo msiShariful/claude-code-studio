@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Api, SettingsEntryDto, SettingsResponse, SettingsScope } from '../api.js'
+import { JsonViewer } from '../components/JsonViewer.js'
 import { PageHeader } from '../components/ui.js'
 import { workspaceProjectDir, type Workspace } from '../workspace.js'
 import type { EditableScope } from './Editor.js'
@@ -80,9 +81,9 @@ export function Hooks({
               configured.map(({ scope, config }) => (
                 <div key={scope} style={{ marginBottom: '0.5rem' }}>
                   <span className={`badge ${scope}`}>{scope}</span>
-                  <pre className="code" style={{ marginTop: '0.4rem' }}>
-                    {JSON.stringify(config, null, 2)}
-                  </pre>
+                  <div style={{ marginTop: '0.4rem' }}>
+                    <JsonViewer value={JSON.stringify(config, null, 2)} />
+                  </div>
                 </div>
               ))
             )}

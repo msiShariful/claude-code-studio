@@ -4,6 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Api } from '../src/api.js'
 import { Editor } from '../src/views/Editor.js'
 
+// The read-only settings viewer is CodeMirror, which needs layout APIs jsdom lacks.
+// Stand in a <pre> that shows the raw text so these tests can assert on file contents.
+vi.mock('../src/components/CodeEditor.js', () => ({
+  CodeEditor: ({ value }: { value: string }) => <pre className="code">{value}</pre>,
+}))
+
 const SETTINGS = {
   entries: [
     {
@@ -127,6 +133,22 @@ describe('Editor view', () => {
     expect(screen.getByRole('button', { name: 'project' })).toBeDefined()
     expect(screen.getByRole('button', { name: 'projectLocal' })).toBeDefined()
     expect(fetchMock.mock.calls[0][0]).toBe(`/api/settings?projectDir=${encodeURIComponent('/work/app')}`)
+  })
+
+  it('reports the active scope tab to the shell on mount and on tab click', async () => {
+    vi.stubGlobal('fetch', stubFetch(PROJECT_SETTINGS))
+    const onScopeChange = vi.fn()
+    render(
+      <Editor
+        api={new Api('t')}
+        workspace={{ kind: 'project', dir: '/work/app' }}
+        onScopeChange={onScopeChange}
+      />,
+    )
+    await screen.findByText('{"model": "sonnet"}')
+    expect(onScopeChange).toHaveBeenCalledWith('project') // default tab on mount
+    fireEvent.click(screen.getByRole('button', { name: 'projectLocal' }))
+    expect(onScopeChange).toHaveBeenLastCalledWith('projectLocal')
   })
 
   it('honors a jump into a scope tab', async () => {
