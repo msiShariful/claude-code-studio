@@ -238,8 +238,8 @@ describe('Plugins view', () => {
       { id: 'code-review@official', version: '1.0.0', scope: 'user', enabled: true, installPath: '/u2' },
     ],
     marketplaces: [{ name: 'official', source: 'github', repo: 'a/b', installLocation: '/m' }],
-    // code-review has been turned off for this project
-    projectEnabled: { 'code-review@official': false },
+    // code-review has been turned off for this project, in the personal (local) file
+    projectEnabledByFile: { project: {}, local: { 'code-review@official': false } },
   }
 
   it('Project scope lists machine-wide plugins as inherited and active', async () => {
@@ -255,6 +255,26 @@ describe('Plugins view', () => {
     expect(within(installed).getByRole('button', { name: /Disable for this project/ })).toBeDefined()
     // code-review is turned off for this project, so it isn't in the active list
     expect(within(installed).queryByText('code-review')).toBeNull()
+  })
+
+  it('Project scope shows each settings file’s own overrides under its pill', async () => {
+    // superpowers is turned off only in the personal (local) file; the team file is clean
+    const list = {
+      ...PROJ_LIST,
+      projectEnabledByFile: { project: {}, local: { 'superpowers@official': false } },
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(list), { status: 200 })),
+    )
+    render(<Plugins api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} />)
+    const installed = await screen.findByRole('region', { name: 'Installed plugins' })
+    // default pill is "Just me" (local): superpowers is off, so it's not in the active table
+    expect(within(installed).queryByText('superpowers')).toBeNull()
+    expect(within(installed).getByText('code-review')).toBeDefined()
+    // the shared "Everyone" file records nothing → superpowers is active again there
+    fireEvent.click(within(installed).getByRole('button', { name: /Everyone/ }))
+    expect(within(installed).getByText('superpowers')).toBeDefined()
   })
 
   it('Project scope disables an inherited plugin for just this project', async () => {
@@ -294,8 +314,10 @@ describe('Plugins view', () => {
     const installed = await screen.findByRole('region', { name: 'Installed plugins' })
     // switch the target from "just me" (local) to the shared/team scope
     fireEvent.click(within(installed).getByRole('button', { name: /Everyone/ }))
-    // disabling now writes to project (shared) scope
-    fireEvent.click(within(installed).getByRole('button', { name: /Disable for this project/ }))
+    // the shared file records nothing yet, so both inherited plugins are active here;
+    // disable superpowers specifically — its change now writes to project (shared) scope
+    const row = within(installed).getByText('superpowers').closest('tr')!
+    fireEvent.click(within(row).getByRole('button', { name: /Disable for this project/ }))
     await screen.findByText(/Disabled superpowers@official for this project/)
     expect(JSON.parse(actionBodies[0])).toMatchObject({
       action: 'disable',

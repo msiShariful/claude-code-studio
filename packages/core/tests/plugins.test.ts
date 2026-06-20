@@ -10,6 +10,7 @@ import {
   marketplaceAction,
   pluginAction,
   readProjectEnabledPlugins,
+  readProjectEnabledPluginsByFile,
   setProjectPluginEnabled,
 } from '../src/plugins.js'
 
@@ -186,6 +187,22 @@ describe('readProjectEnabledPlugins', () => {
   it('ignores non-boolean entries and a non-object enabledPlugins', async () => {
     const dir = await projectFixture({ enabledPlugins: { 'a@m': 'yes', 'b@m': true } }, {})
     expect(await readProjectEnabledPlugins(dir)).toEqual({ 'b@m': true })
+  })
+
+  it('keeps the two files separate via readProjectEnabledPluginsByFile', async () => {
+    const dir = await projectFixture(
+      { enabledPlugins: { 'a@m': true } },
+      { enabledPlugins: { 'b@m': false, 'a@m': false } },
+    )
+    expect(await readProjectEnabledPluginsByFile(dir)).toEqual({
+      project: { 'a@m': true },
+      local: { 'b@m': false, 'a@m': false },
+    })
+  })
+
+  it('returns empty maps per file when the project has no settings', async () => {
+    const dir = await projectFixture()
+    expect(await readProjectEnabledPluginsByFile(dir)).toEqual({ project: {}, local: {} })
   })
 })
 

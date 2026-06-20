@@ -147,27 +147,52 @@ function hasEnabledEntry(state: JsonFileState<Record<string, unknown>>, id: stri
   return isObject(enabled) && id in enabled
 }
 
-/**
- * A project's per-plugin on/off overrides, read straight from its settings files
- * (`enabledPlugins` map) — local settings win over shared project settings. This is
- * the reliable source for project enablement; `claude plugin list` only reports it
- * for projects already registered in `~/.claude.json`.
- */
-export async function readProjectEnabledPlugins(
-  projectDir: string,
-): Promise<Record<string, boolean>> {
-  const paths = getProjectPaths(projectDir)
+/** A project's two enablement files, each as its own override map. */
+export interface ProjectEnabledByFile {
+  /** shared `.claude/settings.json` — committed, applies to the whole team */
+  project: Record<string, boolean>
+  /** personal `.claude/settings.local.json` — gitignored, applies to you only */
+  local: Record<string, boolean>
+}
+
+/** The boolean `enabledPlugins` entries recorded in a single settings file. */
+async function readEnabledMap(file: string): Promise<Record<string, boolean>> {
+  const state = await readJsonFile<Record<string, unknown>>(file)
+  const enabled = state.value?.enabledPlugins
   const out: Record<string, boolean> = {}
-  // project first, then local — later writes override earlier ones.
-  for (const file of [paths.settings, paths.settingsLocal]) {
-    const state = await readJsonFile<Record<string, unknown>>(file)
-    const enabled = state.value?.enabledPlugins
-    if (!isObject(enabled)) continue
+  if (isObject(enabled)) {
     for (const [id, on] of Object.entries(enabled)) {
       if (typeof on === 'boolean') out[id] = on
     }
   }
   return out
+}
+
+/**
+ * A project's per-plugin overrides kept *separated by file*, so the UI can show what
+ * the shared `settings.json` records apart from the personal `settings.local.json` —
+ * the same split the settings editor draws. `claude plugin list` only reports these
+ * for projects already registered in `~/.claude.json`, so we read the files directly.
+ */
+export async function readProjectEnabledPluginsByFile(
+  projectDir: string,
+): Promise<ProjectEnabledByFile> {
+  const paths = getProjectPaths(projectDir)
+  return {
+    project: await readEnabledMap(paths.settings),
+    local: await readEnabledMap(paths.settingsLocal),
+  }
+}
+
+/**
+ * A project's per-plugin on/off overrides, merged across its settings files — local
+ * settings win over shared project settings (the effective enablement state).
+ */
+export async function readProjectEnabledPlugins(
+  projectDir: string,
+): Promise<Record<string, boolean>> {
+  const { project, local } = await readProjectEnabledPluginsByFile(projectDir)
+  return { ...project, ...local }
 }
 
 /**

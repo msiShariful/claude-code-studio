@@ -106,9 +106,13 @@ describe('/api/plugins', () => {
     ])
   })
 
-  it('returns the project enablement overrides when a projectDir is given', async () => {
+  it('returns the project enablement overrides split per file when a projectDir is given', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'ccs-plugin-proj-'))
     await mkdir(join(dir, '.claude'), { recursive: true })
+    await writeFile(
+      join(dir, '.claude', 'settings.json'),
+      JSON.stringify({ enabledPlugins: { 'code-review@official': true } }),
+    )
     await writeFile(
       join(dir, '.claude', 'settings.local.json'),
       JSON.stringify({ enabledPlugins: { 'superpowers@claude-plugins-official': false } }),
@@ -116,8 +120,9 @@ describe('/api/plugins', () => {
     const { app } = await fixture({ runner: listRunner() })
     const res = await app.inject({ url: `/api/plugins?projectDir=${encodeURIComponent(dir)}`, headers: auth })
     expect(res.statusCode).toBe(200)
-    expect(res.json().projectEnabled).toEqual({
-      'superpowers@claude-plugins-official': false,
+    expect(res.json().projectEnabledByFile).toEqual({
+      project: { 'code-review@official': true },
+      local: { 'superpowers@claude-plugins-official': false },
     })
   })
 

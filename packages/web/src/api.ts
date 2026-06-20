@@ -140,8 +140,12 @@ export interface PluginsListDto {
   cliFound: boolean
   plugins: PluginDto[]
   marketplaces: MarketplaceDto[]
-  /** Present when a projectDir was given: per-plugin on/off overrides for that project. */
-  projectEnabled?: Record<string, boolean>
+  /**
+   * Present when a projectDir was given: the project's per-plugin on/off overrides,
+   * kept split by file so each can be shown on its own — `project` is the shared
+   * `.claude/settings.json`, `local` the personal `.claude/settings.local.json`.
+   */
+  projectEnabledByFile?: { project: Record<string, boolean>; local: Record<string, boolean> }
 }
 
 export interface AvailablePluginDto {

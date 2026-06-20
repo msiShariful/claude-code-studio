@@ -581,10 +581,12 @@ function ProjectPlugins({
   onInstallElsewhere?: () => void
 }) {
   const [enabling, setEnabling] = useState(false)
-  // Where per-project enable/disable writes: 'project' = .claude/settings.json
-  // (shared with the team), 'local' = .claude/settings.local.json (just me).
+  // The chosen file is both what you're *viewing* and where a change is *saved*:
+  // 'project' = .claude/settings.json (shared with the team), 'local' =
+  // .claude/settings.local.json (just me). Each file gets its own list below.
   const [target, setTarget] = useState<'project' | 'local'>('local')
-  const overrides = data.projectEnabled ?? {}
+  const byFile = data.projectEnabledByFile ?? { project: {}, local: {} }
+  const overrides = byFile[target]
 
   // Machine-wide (user-scope) plugins, deduped by id — the set inherited here.
   const machineWide: PluginDto[] = []
@@ -640,10 +642,10 @@ function ProjectPlugins({
         </span>
       </div>
       <p className="dim section-sub">
-        Plugins are installed machine-wide and active in every project. Choose where a per-project
-        change is saved, then enable or disable each plugin for this project.
+        Plugins are installed machine-wide and active in every project. Pick a settings file to see
+        the overrides it records — then enable or disable each plugin for this project.
       </p>
-      <div className="scope-picker" role="group" aria-label="Where changes are saved">
+      <div className="scope-picker" role="group" aria-label="Settings file to view and edit">
         <button
           type="button"
           className={target === 'project' ? 'active project' : ''}
@@ -661,8 +663,8 @@ function ProjectPlugins({
       </div>
       <p className="dim section-sub" style={{ marginTop: '-0.75rem' }}>
         {target === 'project'
-          ? 'Changes go to the project’s shared .claude/settings.json — committed and applied for everyone on the project.'
-          : 'Changes go to .claude/settings.local.json — personal and not committed, applied only for you.'}
+          ? 'Showing the project’s shared .claude/settings.json — overrides here are committed and apply to everyone on the project.'
+          : 'Showing your personal .claude/settings.local.json — overrides here are not committed and apply only to you.'}
       </p>
 
       {enabling && off.length > 0 && (

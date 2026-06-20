@@ -4,7 +4,7 @@ import {
   listPlugins,
   marketplaceAction,
   pluginAction,
-  readProjectEnabledPlugins,
+  readProjectEnabledPluginsByFile,
   setProjectPluginEnabled,
   type CliRunResult,
   type MarketplaceActionName,
@@ -38,17 +38,30 @@ export function pluginsRoutes(app: FastifyInstance, ctx: ServerContext): void {
       return reply.code(400).send({ error: 'projectDir must be an absolute path' })
     }
     // Per-project overrides come from the project's own settings files, not the CLI,
-    // so they're available even when the claude binary is absent.
-    const projectEnabled = projectDir ? await readProjectEnabledPlugins(projectDir) : undefined
+    // so they're available even when the claude binary is absent. Kept split per file
+    // (settings.json vs settings.local.json) so the UI can show each on its own.
+    const projectEnabledByFile = projectDir
+      ? await readProjectEnabledPluginsByFile(projectDir)
+      : undefined
     try {
       const [plugins, marketplaces] = await Promise.all([
         listPlugins(ctx.runner),
         listMarketplaces(ctx.runner),
       ])
-      return { cliFound: true, plugins, marketplaces, ...(projectEnabled && { projectEnabled }) }
+      return {
+        cliFound: true,
+        plugins,
+        marketplaces,
+        ...(projectEnabledByFile && { projectEnabledByFile }),
+      }
     } catch (err) {
       if (isMissingBinary(err)) {
-        return { cliFound: false, plugins: [], marketplaces: [], ...(projectEnabled && { projectEnabled }) }
+        return {
+          cliFound: false,
+          plugins: [],
+          marketplaces: [],
+          ...(projectEnabledByFile && { projectEnabledByFile }),
+        }
       }
       throw err
     }
