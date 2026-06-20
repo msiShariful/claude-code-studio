@@ -1070,6 +1070,20 @@ textarea {
   font-size: 0.75rem;
 }
 
+/* ---- file editor (agents/skills/memory) ---- */
+
+.file-editor {
+  margin-bottom: 1.5rem;
+}
+
+/* a long agents/skills list stays scannable instead of dominating the page;
+   the create control lives in the page header, so it's reachable regardless */
+.file-list {
+  max-height: 24rem;
+  overflow-y: auto;
+  border-radius: var(--radius);
+}
+
 /* ---- info tooltip ---- */
 
 .infotip {

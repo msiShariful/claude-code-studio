@@ -84,6 +84,7 @@ export function CodeEditor({
   language = 'text',
   disabled = false,
   readOnly = false,
+  minHeight,
 }: {
   value: string
   onChange?: (next: string) => void
@@ -92,6 +93,8 @@ export function CodeEditor({
   disabled?: boolean
   /** a permanent read-only viewer (still folds, scrolls, and highlights) */
   readOnly?: boolean
+  /** a comfortable minimum editor height (e.g. '22rem') — viewers size to content */
+  minHeight?: string
 }) {
   const noEdit = disabled || readOnly
   const host = useRef<HTMLDivElement>(null)
@@ -110,6 +113,7 @@ export function CodeEditor({
         languageExtension(language),
         syntaxHighlighting(highlight),
         theme,
+        ...(minHeight ? [EditorView.theme({ '.cm-scroller': { minHeight } })] : []),
         EditorView.lineWrapping,
         editable.current.of([EditorState.readOnly.of(noEdit), EditorView.editable.of(!noEdit)]),
         EditorView.updateListener.of((u) => {

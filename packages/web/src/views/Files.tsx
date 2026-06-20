@@ -70,6 +70,7 @@ export function Files({
   const [open, setOpen] = useState<Open | null>(null)
   const [dirty, setDirty] = useState(false)
   const [newName, setNewName] = useState('')
+  const [creating, setCreating] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
@@ -143,6 +144,7 @@ export function Files({
   }
 
   function createNew() {
+    if (!newName.trim()) return
     const name = kind === 'agent' && !newName.endsWith('.md') ? `${newName}.md` : newName
     setOpen({
       kind,
@@ -154,6 +156,7 @@ export function Files({
     })
     setDirty(true)
     setNewName('')
+    setCreating(false)
   }
 
   if (!listing) return <p className="dim">Loading…</p>
@@ -162,59 +165,55 @@ export function Files({
   const isList = kind === 'agent' || kind === 'skill'
   const singleFile = kind === 'claudeMd' ? scopeFiles?.claudeMd : kind === 'keybindings' ? listing.user.keybindings : undefined
 
+  const list = kind === 'agent' ? scopeFiles?.agents : kind === 'skill' ? scopeFiles?.skills : undefined
+
   return (
     <>
-      <PageHeader title={header.title} label={header.label} info={header.info} />
+      <PageHeader
+        title={header.title}
+        label={header.label}
+        info={header.info}
+        actions={
+          isList ? (
+            <>
+              {list && list.length > 0 && <span className="section-meta">{list.length}</span>}
+              <button className="ghost" onClick={() => setCreating((v) => !v)}>
+                {creating ? 'Cancel' : `+ New ${kind}`}
+              </button>
+            </>
+          ) : (
+            <button className="ghost" onClick={() => void openFile(kind)}>
+              {singleFile?.exists ? `Open ${header.title}` : `Create ${header.title}`}
+            </button>
+          )
+        }
+      />
       {message && <div className={`alert ${message.kind}`}>{message.text}</div>}
 
-      {!isList && (
+      {isList && creating && (
         <div className="toolbar">
-          <button className="ghost" onClick={() => void openFile(kind)}>
-            {singleFile?.exists ? `Open ${header.title}` : `Create ${header.title}`}
+          <input
+            autoFocus
+            placeholder={kind === 'agent' ? 'new-agent-name' : 'new-skill-name'}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') createNew()
+              if (e.key === 'Escape') setCreating(false)
+            }}
+          />
+          <button className="action" disabled={!newName.trim()} onClick={createNew}>
+            Create {kind}
           </button>
-          <span className="dim">{singleFile?.path}</span>
         </div>
       )}
 
-      {isList &&
-        (() => {
-          const list = kind === 'agent' ? scopeFiles?.agents : scopeFiles?.skills
-          return (
-            <>
-              {list?.length === 0 ? (
-                <p className="dim">None yet.</p>
-              ) : (
-                <table className="kv">
-                  <tbody>
-                    {list?.map((f) => (
-                      <tr key={f.name}>
-                        <td className="path">
-                          <button className="ghost" onClick={() => void openFile(kind, f.name)}>
-                            {f.name}
-                          </button>
-                        </td>
-                        <td className="value dim">{f.path}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-              <div className="toolbar">
-                <input
-                  placeholder={kind === 'agent' ? 'new-agent-name' : 'new-skill-name'}
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                />
-                <button className="ghost" disabled={!newName.trim()} onClick={createNew}>
-                  + New {kind}
-                </button>
-              </div>
-            </>
-          )
-        })()}
+      {!isList && <p className="dim">{singleFile?.path}</p>}
 
+      {/* The editor sits above the list so opening or creating a file is front-and-centre,
+          even when the list below is long. */}
       {open && (
-        <>
+        <div className="file-editor">
           <p className="dim">
             {open.path}
             {dirty ? ' — unsaved changes' : ''}
@@ -225,6 +224,7 @@ export function Files({
               value={open.content}
               language={LANGUAGE[open.kind]}
               disabled={busy}
+              minHeight="22rem"
               onChange={(next) => {
                 setOpen((prev) => (prev ? { ...prev, content: next } : prev))
                 setDirty(true)
@@ -246,8 +246,30 @@ export function Files({
               Close
             </button>
           </div>
-        </>
+        </div>
       )}
+
+      {isList &&
+        (list && list.length > 0 ? (
+          <div className="file-list">
+            <table className="kv">
+              <tbody>
+                {list.map((f) => (
+                  <tr key={f.name}>
+                    <td className="path">
+                      <button className="ghost" onClick={() => void openFile(kind, f.name)}>
+                        {f.name}
+                      </button>
+                    </td>
+                    <td className="value dim">{f.path}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          !open && <p className="dim">None yet — create your first {kind}.</p>
+        ))}
     </>
   )
 }

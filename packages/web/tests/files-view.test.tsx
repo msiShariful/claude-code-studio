@@ -59,6 +59,21 @@ describe('Files view', () => {
     expect(screen.getByText('Save')).toBeDefined()
   })
 
+  it('creates a new agent from the header control, above the list', async () => {
+    vi.stubGlobal('fetch', stub())
+    render(<Files api={new Api('t')} workspace={{ kind: 'global' }} kind="agent" />)
+    await screen.findByText('reviewer.md')
+    // the create control lives in the header (reachable without scrolling the list)
+    fireEvent.click(screen.getByRole('button', { name: '+ New agent' }))
+    fireEvent.change(screen.getByPlaceholderText('new-agent-name'), {
+      target: { value: 'planner' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create agent' }))
+    // the editor opens on the new (unsaved) file
+    expect(await screen.findByText(/\(new file\)/)).toBeDefined()
+    expect(screen.getByText('Save')).toBeDefined()
+  })
+
   it('the agents view in a project lists project agents only', async () => {
     vi.stubGlobal('fetch', stub())
     render(<Files api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} kind="agent" />)
