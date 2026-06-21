@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Claude Code Studio" width="100%" />
+  <img src="https://raw.githubusercontent.com/msiShariful/claude-code-studio/main/assets/banner.png" alt="Claude Code Studio" width="100%" />
 </p>
 
 <h1 align="center">Claude Code Studio</h1>
@@ -27,7 +27,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/dashboard.png" alt="Claude Code Studio dashboard" width="100%" />
+  <img src="https://raw.githubusercontent.com/msiShariful/claude-code-studio/main/assets/dashboard.png" alt="Claude Code Studio dashboard" width="100%" />
 </p>
 
 ---
@@ -56,21 +56,21 @@ Claude Code Studio is a friendly front end over all of it. It reads and writes t
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="assets/settings-editor.png"><img src="assets/settings-editor.png" alt="Settings editor" /></a>
+      <a href="https://raw.githubusercontent.com/msiShariful/claude-code-studio/main/assets/settings-editor.png"><img src="https://raw.githubusercontent.com/msiShariful/claude-code-studio/main/assets/settings-editor.png" alt="Settings editor" /></a>
       <p><b>Edit settings with a diff.</b> Every JSON config renders with syntax highlighting and folding; changes preview as a color diff before they're written.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="assets/effective-config.png"><img src="assets/effective-config.png" alt="Effective config" /></a>
+      <a href="https://raw.githubusercontent.com/msiShariful/claude-code-studio/main/assets/effective-config.png"><img src="https://raw.githubusercontent.com/msiShariful/claude-code-studio/main/assets/effective-config.png" alt="Effective config" /></a>
       <p><b>See the effective config.</b> Every merged value, badged with the scope it comes from — click one to edit it at its source.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="assets/claude-md.png"><img src="assets/claude-md.png" alt="CLAUDE.md editor" /></a>
+      <a href="https://raw.githubusercontent.com/msiShariful/claude-code-studio/main/assets/claude-md.png"><img src="https://raw.githubusercontent.com/msiShariful/claude-code-studio/main/assets/claude-md.png" alt="CLAUDE.md editor" /></a>
       <p><b>Write memory and agents.</b> CLAUDE.md, agents, and skills open in a real Markdown editor with highlighting and line numbers.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="assets/plugins.png"><img src="assets/plugins.png" alt="Plugins and marketplaces" /></a>
+      <a href="https://raw.githubusercontent.com/msiShariful/claude-code-studio/main/assets/plugins.png"><img src="https://raw.githubusercontent.com/msiShariful/claude-code-studio/main/assets/plugins.png" alt="Plugins and marketplaces" /></a>
       <p><b>Install plugins from marketplaces.</b> Browse, install, enable/disable, and manage the marketplaces they come from.</p>
     </td>
   </tr>
