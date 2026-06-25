@@ -29,11 +29,6 @@ const SETTINGS = {
 const PROJECT_SETTINGS = {
   entries: [
     {
-      scope: 'user',
-      editable: true,
-      state: { path: '/home/u/.claude/settings.json', exists: true, raw: '{"model": "opus"}' },
-    },
-    {
       scope: 'project',
       editable: true,
       state: { path: '/work/app/.claude/settings.json', exists: true, raw: '{"model": "sonnet"}' },
@@ -61,6 +56,9 @@ function stubFetch(settings: unknown = SETTINGS) {
     if (url.startsWith('/api/settings/preview')) {
       return Promise.resolve(new Response(JSON.stringify(PREVIEW), { status: 200 }))
     }
+    if (url.startsWith('/api/settings/apply')) {
+      return Promise.resolve(new Response(JSON.stringify({ applied: true, diff: '' }), { status: 200 }))
+    }
     return Promise.resolve(new Response(JSON.stringify(settings), { status: 200 }))
   })
 }
@@ -71,49 +69,64 @@ describe('Editor view', () => {
     vi.unstubAllGlobals()
   })
 
-  it('global workspace shows the user file and previews a diff', async () => {
+  it('renders catalog rows and previews a change to a setting', async () => {
     vi.stubGlobal('fetch', stubFetch())
     render(<Editor api={new Api('t')} workspace={{ kind: 'global' }} />)
-    expect(await screen.findByText('{"model": "opus"}')).toBeDefined()
 
-    fireEvent.change(screen.getByPlaceholderText('model or env.FOO'), {
-      target: { value: 'model' },
-    })
-    fireEvent.change(screen.getByPlaceholderText('"sonnet" or {"a": 1} or plain text'), {
-      target: { value: '"sonnet"' },
-    })
+    // The Model field is populated from the file, shown by its plain name.
+    const model = (await screen.findByLabelText('Model')) as HTMLInputElement
+    expect(model.value).toBe('opus')
+
+    fireEvent.change(model, { target: { value: 'sonnet' } })
+    expect(screen.getByText('1 change')).toBeDefined()
+
     await act(async () => {
       fireEvent.click(screen.getByText('Preview diff'))
     })
-
     expect(await screen.findByText('+  "model": "sonnet"', { normalizer: (s) => s })).toBeDefined()
     expect(screen.getByText('Apply change')).toBeDefined()
   })
 
-  it('discards a previewed diff when an edit row is deleted', async () => {
+  it('toggles a boolean and applies it as a settings edit', async () => {
+    const fetchMock = stubFetch()
+    vi.stubGlobal('fetch', fetchMock)
+    render(<Editor api={new Api('t')} workspace={{ kind: 'global' }} />)
+
+    // includeCoAuthoredBy defaults on; flipping it off is a real change.
+    const toggle = await screen.findByRole('switch', { name: 'Co-authored-by trailer' })
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Preview diff'))
+    })
+    await act(async () => {
+      fireEvent.click(await screen.findByText('Apply change'))
+    })
+
+    const applyCall = fetchMock.mock.calls.find((c) => String(c[0]).startsWith('/api/settings/apply'))
+    expect(applyCall).toBeDefined()
+    const body = JSON.parse((applyCall![1] as RequestInit).body as string)
+    expect(body.edits).toContainEqual({ path: 'includeCoAuthoredBy', value: false })
+  })
+
+  it('discards queued changes', async () => {
     vi.stubGlobal('fetch', stubFetch())
-    const { container } = render(<Editor api={new Api('t')} workspace={{ kind: 'global' }} />)
-    const view = within(container)
+    render(<Editor api={new Api('t')} workspace={{ kind: 'global' }} />)
 
-    await view.findByText('{"model": "opus"}')
+    const model = await screen.findByLabelText('Model')
+    fireEvent.change(model, { target: { value: 'haiku' } })
+    expect(screen.getByText('1 change')).toBeDefined()
 
-    fireEvent.change(view.getByPlaceholderText('model or env.FOO'), {
-      target: { value: 'model' },
-    })
-    fireEvent.change(view.getByPlaceholderText('"sonnet" or {"a": 1} or plain text'), {
-      target: { value: '"sonnet"' },
-    })
-    fireEvent.click(view.getByText('Preview diff'))
-    await view.findByText('Apply change')
-
-    fireEvent.click(view.getByText('×'))
-    expect(view.queryByText('Apply change')).toBeNull()
+    fireEvent.click(screen.getByText('Discard'))
+    expect(screen.queryByText('1 change')).toBeNull()
   })
 
   it('global workspace offers user and managed tabs; managed is read-only', async () => {
     vi.stubGlobal('fetch', stubFetch())
     render(<Editor api={new Api('t')} workspace={{ kind: 'global' }} />)
-    await screen.findByText('{"model": "opus"}')
+    await screen.findByLabelText('Model')
 
     expect(screen.queryByRole('button', { name: 'project' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'managed' }))
@@ -126,7 +139,7 @@ describe('Editor view', () => {
     const fetchMock = stubFetch(PROJECT_SETTINGS)
     vi.stubGlobal('fetch', fetchMock)
     render(<Editor api={new Api('t')} workspace={{ kind: 'project', dir: '/work/app' }} />)
-    expect(await screen.findByText('{"model": "sonnet"}')).toBeDefined()
+    expect(await screen.findByText('/work/app/.claude/settings.json')).toBeDefined()
 
     expect(screen.queryByRole('button', { name: 'user' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'managed' })).toBeNull()
@@ -145,13 +158,13 @@ describe('Editor view', () => {
         onScopeChange={onScopeChange}
       />,
     )
-    await screen.findByText('{"model": "sonnet"}')
+    await screen.findByText('/work/app/.claude/settings.json')
     expect(onScopeChange).toHaveBeenCalledWith('project') // default tab on mount
     fireEvent.click(screen.getByRole('button', { name: 'projectLocal' }))
     expect(onScopeChange).toHaveBeenLastCalledWith('projectLocal')
   })
 
-  it('honors a jump into a scope tab', async () => {
+  it('honors a jump by opening the advanced editor on that key', async () => {
     vi.stubGlobal('fetch', stubFetch(PROJECT_SETTINGS))
     const consumed = vi.fn()
     render(
@@ -164,5 +177,29 @@ describe('Editor view', () => {
     )
     expect(await screen.findByDisplayValue('hooks.Stop')).toBeDefined()
     expect(consumed).toHaveBeenCalled()
+  })
+
+  it('the advanced raw editor still queues an arbitrary key', async () => {
+    vi.stubGlobal('fetch', stubFetch())
+    render(<Editor api={new Api('t')} workspace={{ kind: 'global' }} />)
+    await screen.findByLabelText('Model')
+
+    fireEvent.change(screen.getByPlaceholderText('model or env.FOO'), {
+      target: { value: 'verbose' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('"sonnet" or {"a": 1} or plain text'), {
+      target: { value: 'true' },
+    })
+    expect(screen.getByText('1 change')).toBeDefined()
+  })
+
+  it('searching narrows the catalog to matching rows', async () => {
+    vi.stubGlobal('fetch', stubFetch())
+    render(<Editor api={new Api('t')} workspace={{ kind: 'global' }} />)
+    const search = await screen.findByPlaceholderText(/Search settings/)
+
+    fireEvent.change(search, { target: { value: 'cleanup' } })
+    expect(screen.getByText('Keep sessions for')).toBeDefined()
+    expect(screen.queryByLabelText('Model')).toBeNull()
   })
 })

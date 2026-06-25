@@ -53,3 +53,28 @@ export function parseEditValue(text: string): unknown {
     return text
   }
 }
+
+/** Read a dotted path (`permissions.defaultMode`) out of a parsed object. */
+export function getAtPath(obj: Record<string, unknown> | undefined, path: string): unknown {
+  if (!obj) return undefined
+  let cur: unknown = obj
+  for (const part of path.split('.')) {
+    if (!isPlainObject(cur)) return undefined
+    cur = cur[part]
+  }
+  return cur
+}
+
+/** Structural equality for JSON-shaped values — used to drop no-op edits. */
+export function jsonEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((x, i) => jsonEqual(x, b[i]))
+  }
+  if (isPlainObject(a) && isPlainObject(b)) {
+    const ak = Object.keys(a)
+    const bk = Object.keys(b)
+    return ak.length === bk.length && ak.every((k) => jsonEqual(a[k], b[k]))
+  }
+  return false
+}

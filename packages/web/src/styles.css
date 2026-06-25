@@ -914,6 +914,460 @@ textarea {
   margin: 0.25rem 0 1rem;
 }
 
+/* ---- settings catalog ----
+   Each known setting is a labelled row: a green/hollow dot for set-here, the
+   plain name beside its real key, the usage, and a type-right control. Editing a
+   row marks it amber (the same bleed-bar the file tree uses for the open file). */
+
+.set-group {
+  margin-top: 1.6rem;
+}
+
+.set-group-head {
+  margin: 0 0 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.set-list {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.set-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 0.5rem minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.4rem 0.9rem;
+  padding: 0.8rem 1rem 0.8rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.set-row:last-child {
+  border-bottom: none;
+}
+
+.set-row.edited {
+  background: var(--accent-soft);
+}
+
+/* the signature, reused: an amber bleed-bar down the left of an edited row */
+.set-row.edited::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+}
+
+.set-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  margin-top: 0.42rem;
+}
+
+.set-dot.on {
+  background: var(--scope-project);
+  box-shadow: 0 0 6px rgba(163, 207, 107, 0.45);
+}
+
+.set-dot.off {
+  border: 1px solid var(--line-strong);
+}
+
+.set-labels {
+  min-width: 0;
+}
+
+.set-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.set-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.set-key {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+}
+
+.set-desc {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+  line-height: 1.45;
+}
+
+.set-note {
+  color: var(--scope-projectLocal);
+}
+
+.set-state {
+  display: block;
+  margin-top: 0.25rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--ink-dim);
+  opacity: 0.85;
+}
+
+.set-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 11rem;
+  max-width: 20rem;
+}
+
+.set-reset {
+  font: inherit;
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+  background: none;
+  border: none;
+  padding: 0.1rem 0.2rem;
+  cursor: pointer;
+}
+
+.set-reset:hover {
+  color: var(--scope-managed);
+  text-decoration: underline;
+}
+
+.set-field {
+  width: 100%;
+  min-width: 9rem;
+}
+
+.set-number {
+  width: 6rem;
+  min-width: 0;
+}
+
+/* ---- toggle switch ---- */
+
+.switch {
+  flex: 0 0 auto;
+  width: 2.3rem;
+  height: 1.3rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-inset);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.switch-knob {
+  position: absolute;
+  top: 50%;
+  left: 0.15rem;
+  width: 0.92rem;
+  height: 0.92rem;
+  border-radius: 999px;
+  background: var(--ink-dim);
+  transform: translateY(-50%);
+  transition: transform 0.14s ease, background 0.14s ease;
+}
+
+.switch.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.switch.on .switch-knob {
+  background: #1a1205;
+  transform: translate(0.98rem, -50%);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch-knob {
+    transition: none;
+  }
+}
+
+/* ---- list (chips) & map (key/value) editors ---- */
+
+.list-editor,
+.map-editor {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.chip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.chip.removable {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip-x {
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: var(--ink-dim);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.chip-x:hover {
+  color: var(--scope-managed);
+}
+
+.list-add {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.list-add input {
+  flex: 1;
+  min-width: 0;
+}
+
+.kv-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.kv-row {
+  display: grid;
+  grid-template-columns: minmax(5rem, auto) 1fr auto;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.kv-key {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kv-add {
+  display: grid;
+  grid-template-columns: minmax(5rem, auto) 1fr auto;
+  gap: 0.4rem;
+}
+
+/* ---- advanced / raw disclosure ---- */
+
+.raw-advanced {
+  margin-top: 1.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.4rem 1rem 0.85rem;
+  background: var(--bg-raised);
+}
+
+.raw-advanced > summary {
+  cursor: pointer;
+  padding: 0.5rem 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ink-dim);
+  list-style-position: inside;
+}
+
+.raw-advanced[open] > summary {
+  color: var(--ink);
+  margin-bottom: 0.6rem;
+}
+
+/* ---- sticky save bar ---- */
+
+.save-bar {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding: 0.7rem 1rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+.save-count {
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .set-row {
+    grid-template-columns: 0.5rem 1fr;
+  }
+  .set-control {
+    grid-column: 2;
+    justify-content: flex-start;
+    max-width: none;
+  }
+}
+
+/* ---- hooks: one card per lifecycle event ---- */
+
+.hook-card {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.hook-card.edited {
+  background: var(--accent-soft);
+}
+
+.hook-card.edited::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background: var(--accent);
+}
+
+.hook-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.hook-event {
+  font-family: var(--mono);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.hook-matcher-kind {
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.hook-card .set-desc {
+  margin-top: 0.2rem;
+}
+
+.hook-empty {
+  margin: 0.6rem 0 0;
+}
+
+.hook-list {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0;
+}
+
+.hook-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.hook-target {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--accent);
+  background: var(--bg-inset);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0.08rem 0.45rem;
+  white-space: nowrap;
+}
+
+.hook-cmd {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hook-meta {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+}
+
+.hook-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--line);
+}
+
+.hook-cmd-input {
+  flex: 1 1 15rem;
+  min-width: 0;
+}
+
+.hook-timeout {
+  width: 6.5rem;
+}
+
+.hook-toolbar {
+  margin: 0.8rem 0 0;
+}
+
 /* ---- gate ---- */
 
 .gate .wordmark {
