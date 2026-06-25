@@ -7,6 +7,9 @@ export default defineConfig({
       '@claude-code-studio/core': fileURLToPath(
         new URL('./packages/core/src/index.ts', import.meta.url),
       ),
+      '@claude-code-studio/usage': fileURLToPath(
+        new URL('./packages/usage/src/index.ts', import.meta.url),
+      ),
     },
   },
   test: {

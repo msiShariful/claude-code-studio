@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
-import { BrowserRouter } from 'react-router-dom'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Api } from './api.js'
 import { Shell } from './shell/Shell.js'
+import { UsageApp } from './usage/UsageApp.js'
 
 export function App({ token }: { token: string | null }) {
   const api = useMemo(() => (token ? new Api(token) : null), [token])
@@ -20,7 +21,11 @@ export function App({ token }: { token: string | null }) {
 
   return (
     <BrowserRouter>
-      <Shell api={api} />
+      <Routes>
+        {/* Usage is its own self-contained area with its own chrome and design. */}
+        <Route path="/usage/*" element={<UsageApp token={token!} />} />
+        <Route path="*" element={<Shell api={api} />} />
+      </Routes>
     </BrowserRouter>
   )
 }

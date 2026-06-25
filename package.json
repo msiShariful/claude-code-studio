@@ -10,7 +10,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build -w @claude-code-studio/core -w @claude-code-studio/usage --if-present && npm run build -w cc-studio -w @claude-code-studio/web --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "preview": "npm run build && rm -rf packages/server/web-dist && node packages/server/dist/bin.js"
   },

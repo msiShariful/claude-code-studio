@@ -11,6 +11,7 @@ import { mcpRoutes } from './routes/mcp.js'
 import { pluginsRoutes } from './routes/plugins.js'
 import { projectsRoutes } from './routes/projects.js'
 import { settingsRoutes } from './routes/settings.js'
+import { usageRoutes } from './routes/usage.js'
 
 export interface BuildOptions {
   token: string
@@ -72,6 +73,7 @@ export function buildServer(opts: BuildOptions): FastifyInstance {
     pluginsRoutes(api, ctx)
     filesRoutes(api, ctx)
     projectsRoutes(api, ctx)
+    usageRoutes(api, ctx)
   })
   return app
 }

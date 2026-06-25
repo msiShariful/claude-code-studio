@@ -171,6 +171,14 @@ export function Shell({ api }: { api: Api }) {
       <header className="topbar">
         <div className="topbar-left">
           <span className="wordmark">Claude Code Studio</span>
+          <div className="area-switch" role="tablist" aria-label="Area">
+            <button role="tab" aria-selected="true" className="on">
+              Configure
+            </button>
+            <button role="tab" aria-selected="false" onClick={() => navigate('/usage')}>
+              Usage
+            </button>
+          </div>
           <WorkspaceSwitcher
             workspace={workspace}
             projects={projects}
