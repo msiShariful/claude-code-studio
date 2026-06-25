@@ -1,6 +1,6 @@
 {
   "name": "cc-studio",
-  "version": "0.7.0",
+  "version": "1.0.0",
   "description": "Claude Code Studio — a local GUI for managing Claude Code settings: config files, MCP servers, plugins, hooks, agents, skills, and CLAUDE.md.",
   "keywords": [
     "claude",
